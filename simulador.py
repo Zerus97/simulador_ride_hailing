@@ -11,13 +11,22 @@ class AlgoritmoReposicionamento: # Classe de algoritmos de reposicionamento
         ...
 
 class SemMovimento(AlgoritmoReposicionamento):
-    def decidir(self, veiculos_ociosos, corridas_ativas, pedidos):
+    def decidir(self, veiculos_ociosos, corridas_ativas, pedidos, grade):
         d = dict()
-        print(veiculos_ociosos)
-        print(corridas_ativas)
-        print(pedidos)
         return d
-
+    
+class Hotspot(AlgoritmoReposicionamento):
+    def decidir(self, veiculos_ociosos, corridas_ativas, pedidos, grade):
+        d = dict()
+        for v in veiculos_ociosos:
+            melhor_zona = max(
+                (z for z in grade.vizinhas(v[1]) if pedidos[z] > 0),
+                key=lambda z: pedidos[z],
+                default=None
+            )
+            d[v[0]] = melhor_zona
+        return d
+    
 class Grade: # Mudar para hexagonos
     """A cidade dividida em zonas, numa grade quadrada size x size."""
 
@@ -96,7 +105,6 @@ class Simulador:
         self.pedidos = [[[] for _ in range(self.grade.size)] for _ in range(self.grade.size)]
         self.corridas_ativas = []
         self.corridas_concluidas = []
-        self.veiculos_ociosos = []
         self.algoritmo = algoritmo
         # espalha os veiculos em zonas aleatorias da grade
         zonas = grade.zonas()
@@ -119,7 +127,6 @@ class Simulador:
         
 
     def matching(self):
-        self.veiculos_ociosos = []
         for v in self.veiculos:
             if v.ocioso:
                 i, j = v.zona
@@ -127,8 +134,6 @@ class Simulador:
                     v.ocioso = False
                     self.corridas_ativas.append(Corrida(v, self.pedidos[i][j][0], self.tempo))
                     self.pedidos[i][j].pop(0)
-                else:
-                    self.veiculos_ociosos.append(v)
     
     def arrivals(self):
         restantes = []
@@ -140,6 +145,12 @@ class Simulador:
             else:
                 restantes.append(corrida)
         self.corridas_ativas = restantes
+
+    def repositioning(self, moves):
+        for veiculo in self.veiculos:
+            destino = moves.get(veiculo.id)
+            if destino is not None:
+                veiculo.zona = destino
 
     def expire(self):
         for i in range(self.grade.size):
@@ -158,11 +169,12 @@ class Simulador:
         self.arrivals()
         self.expire()
         self.matching()
-        self.algoritmo.decidir(self.listar_veiculos(ociosos=True),
+        repositioning = self.algoritmo.decidir(self.listar_veiculos(ociosos=True),
                                self.contar_veiculos_por_zona_futura(ociosos=False), 
-                               self.contar_pedidos_por_zona())
+                               self.contar_pedidos_por_zona(),
+                               self.grade)
+        self.repositioning(repositioning)
         self.ociosidade()
-        n_ociosos = sum(1 for v in self.veiculos if v.ocioso)
 
     def ociosidade(self):
         """Calcula a ociosidade"""
@@ -233,11 +245,12 @@ class Simulador:
 
 if __name__ == "__main__":
     random.seed(0)  # fixa a aleatoriedade para o resultado ser sempre igual
-    grade = Grade(size=5)                 # cidade 5x5 = 25 zonas
-    algoritmo = SemMovimento()
-    sim = Simulador(grade, num_veiculos=10, lam=0.40, algoritmo=algoritmo)
+    grade = Grade(size=10)                 # cidade 5x5 = 25 zonas
+    # algoritmo = SemMovimento()
+    algoritmo = Hotspot()
+    sim = Simulador(grade, num_veiculos=40, lam=0.40, algoritmo=algoritmo)
     print(f"Simulador criado: {len(grade.zonas())} zonas, {len(sim.veiculos)} veiculos")
-    sim.rodar(passos=1)
+    sim.rodar(passos=500)
     sim.metrics()
     # sim.mostrar()
     # sim.mostrar_v2()
