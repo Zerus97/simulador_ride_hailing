@@ -4,8 +4,21 @@
 
 import random
 import numpy as np
+from collections import Counter
 
-class Grade:
+class AlgoritmoReposicionamento: # Classe de algoritmos de reposicionamento
+    def decidir(self):
+        ...
+
+class SemMovimento(AlgoritmoReposicionamento):
+    def decidir(self, veiculos_ociosos, corridas_ativas, pedidos):
+        d = dict()
+        print(veiculos_ociosos)
+        print(corridas_ativas)
+        print(pedidos)
+        return d
+
+class Grade: # Mudar para hexagonos
     """A cidade dividida em zonas, numa grade quadrada size x size."""
 
     def __init__(self, size):
@@ -39,7 +52,7 @@ class Veiculo:
                 f"Zona = {self.zona}, "
                 f"Ocioso={self.ocioso})")
 
-class Pedido:
+class Pedido: # Custo precisa ser calculado baseado na distancia entre origem e destino
     proximo_id = 1
     """Um pedido que tem uma origem, destino e custo"""
     def __init__(self, cliente, origem, destino, custo, timestep):
@@ -56,7 +69,7 @@ class Pedido:
                 f"{self.origem}->{self.destino}, "
                 f"custo={self.custo})")
     
-class Corrida:
+class Corrida: # Como calcular horário de chegada?
     """Um corrida que tem um veículo e um pedido a ser atendido"""
     def __init__(self, veiculo, pedido, timestep):
         self.veiculo = veiculo
@@ -76,13 +89,15 @@ class Corrida:
 class Simulador:
     """Junta a grade e os veiculos, e faz o tempo avancar em passos."""
 
-    def __init__(self, grade, num_veiculos, lam):
+    def __init__(self, grade, num_veiculos, lam, algoritmo): # Como definir o lam de forma que represente melhor a realidade?
         self.grade = grade
         self.tempo = 0
         self.lam = lam
         self.pedidos = [[[] for _ in range(self.grade.size)] for _ in range(self.grade.size)]
         self.corridas_ativas = []
         self.corridas_concluidas = []
+        self.veiculos_ociosos = []
+        self.algoritmo = algoritmo
         # espalha os veiculos em zonas aleatorias da grade
         zonas = grade.zonas()
         self.ociosidades = 0
@@ -104,6 +119,7 @@ class Simulador:
         
 
     def matching(self):
+        self.veiculos_ociosos = []
         for v in self.veiculos:
             if v.ocioso:
                 i, j = v.zona
@@ -111,6 +127,8 @@ class Simulador:
                     v.ocioso = False
                     self.corridas_ativas.append(Corrida(v, self.pedidos[i][j][0], self.tempo))
                     self.pedidos[i][j].pop(0)
+                else:
+                    self.veiculos_ociosos.append(v)
     
     def arrivals(self):
         restantes = []
@@ -135,16 +153,16 @@ class Simulador:
                 self.pedidos[i][j] = novas_lista
 
     def passo(self):
-        """Um passo de tempo. Por enquanto so avanca o relogio e reporta."""
         self.tempo += 1
         self.demanda()
         self.arrivals()
         self.expire()
         self.matching()
+        self.algoritmo.decidir(self.listar_veiculos(ociosos=True),
+                               self.contar_veiculos_por_zona_futura(ociosos=False), 
+                               self.contar_pedidos_por_zona())
         self.ociosidade()
         n_ociosos = sum(1 for v in self.veiculos if v.ocioso)
-
-        # print(f"t={self.tempo}: {n_ociosos} veiculos ociosos de {len(self.veiculos)}")
 
     def ociosidade(self):
         """Calcula a ociosidade"""
@@ -157,6 +175,7 @@ class Simulador:
             # self.mostrar()
 
     def mostrar(self):
+        print(f"t={self.tempo}")
         for i in range(self.grade.size):
             for j in range(self.grade.size):
                 zona = (i, j)
@@ -189,14 +208,36 @@ class Simulador:
               f"Corridas Completadas: {corridas_completadas}, "
               f"Taxa de Ociosidade: {taxa_ociosidade}")
 
+    def contar_pedidos_por_zona(self):
+            return {
+                (i, j): len(self.pedidos[i][j])
+                for i in range(self.grade.size)
+                for j in range(self.grade.size)
+            }
+
+    def contar_veiculos_por_zona_futura(self, ociosos=True):
+        contagem = Counter()
+        for corrida in self.corridas_ativas:
+            contagem[corrida.pedido.destino] += 1
+        return contagem
+
+    def listar_veiculos(self, ociosos=True):
+        return [
+            (v.id, v.zona)
+            for v in self.veiculos
+            if v.ocioso == ociosos
+        ]
+    
+
 
 
 if __name__ == "__main__":
     random.seed(0)  # fixa a aleatoriedade para o resultado ser sempre igual
     grade = Grade(size=5)                 # cidade 5x5 = 25 zonas
-    sim = Simulador(grade, num_veiculos=10, lam=0.40)
+    algoritmo = SemMovimento()
+    sim = Simulador(grade, num_veiculos=10, lam=0.40, algoritmo=algoritmo)
     print(f"Simulador criado: {len(grade.zonas())} zonas, {len(sim.veiculos)} veiculos")
-    sim.rodar(passos=500)
+    sim.rodar(passos=1)
     sim.metrics()
     # sim.mostrar()
     # sim.mostrar_v2()
