@@ -40,18 +40,21 @@ Dentro do simulador, existem dois baselines de algoritmos de reposicionamento di
 
 ### 4\. Criando seu próprio algoritmo
 
-Dentro do simulador existe uma classe chamada AlgoritmoReposicionamento com um método chamado decidir().
-Para implementar seu algoritmo basta criar uma nova classe referenciando ela e implementar o método a seguir:
+Dentro do simulador existe uma classe chamada `AlgoritmoReposicionamento` com um método chamado `decidir()`.
+Para implementar seu algoritmo basta criar uma nova classe que herde ela e implementar o método a seguir:
 ```python
 class MeuAlgoritmo(AlgoritmoReposicionamento):
    def decidir(self, veiculos_ociosos, corridas_ativas, pedidos, grade):
         d = dict()
+        #sua lógica aqui
         return d
 ```
 Este método recebe como input:
-- veiculos_ociosos: [(id_veiculo, (zona)), (6, (7,4))]
-- corridas_ativas: ({(zona_destino) : numero de carros, (6,1): 4})
-- pedidos: {(zona): numero de pedidos, (0,1): 2}
-- grade: Uma instancia da grade do simulador
+| Parâmetro | Descrição | Exemplo |
+|-----------|-----------|---------|
+| `veiculos_ociosos` | Lista de tuplas `(id_veiculo, zona)` com os veículos disponíveis, onde `zona` é uma tupla `(i, j)`. | `[(6, (7, 4))]` |
+| `corridas_ativas` | Dicionário no formato `{zona_destino: numero_de_carros}`. | `{(6, 1): 4}` |
+| `pedidos` | Dicionário no formato `{zona: numero_de_pedidos}`. | `{(0, 1): 2}` |
+| `grade` | Instância da grade do simulador. | — |
 
 O retorno deste método deve ser um dicionário contendo cada veículo a ser reposicionado(seu id) e a zona para qual zona deve ir no formado (i, j).
