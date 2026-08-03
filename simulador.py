@@ -1,6 +1,4 @@
-# simulador.py — versao minima (incremento 1)
-# Objetivo: montar o esqueleto que roda "vazio":
-# uma grade de zonas, alguns veiculos, e um laco de tempo.
+# simulador.py — versao minima
 
 import random
 import numpy as np

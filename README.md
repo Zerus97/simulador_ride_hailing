@@ -57,4 +57,4 @@ Este método recebe como input:
 | `pedidos` | Dicionário no formato `{zona: numero_de_pedidos}`. | `{(0, 1): 2}` |
 | `grade` | Instância da grade do simulador. | — |
 
-O retorno deste método deve ser um dicionário contendo cada veículo a ser reposicionado(seu id) e a zona para qual zona deve ir no formado (i, j).
+O retorno deste método deve ser um dicionário onde cada chave representa o id do veiculo a ser reposicionado(seu id) e a zona para qual zona deve ir no formado (i, j).
