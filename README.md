@@ -31,9 +31,9 @@ Dentro do simulador, existem dois baselines de algoritmos de reposicionamento di
 
 Dentro do simulador existe uma classe chamada AlgoritmoReposicionamento com um método chamado decidir().
 Para implementar seu algoritmo basta criar uma nova classe referenciando ela e implementar o método a seguir:
-`class MeuAlgoritmo(AlgoritmoReposicionamento):
+```class MeuAlgoritmo(AlgoritmoReposicionamento):
    def decidir(self, veiculos_ociosos, corridas_ativas, pedidos, grade):
         d = dict()
-        return d`
+        return d```
 
 O retorno deste método deve ser um dicionário contendo cada veículo a ser reposicionado(seu id) e a zona para qual deve ir no formado (i, j).
