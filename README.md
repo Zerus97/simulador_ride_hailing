@@ -3,10 +3,17 @@ Este programa foi pensado para avalair os diferentes tipos de algoritmos de repo
 
 Requerimentos:
 - numpy
+- Python 3
 
 ## Instalação
-Para instalar basta rodar o comando:
-1. `git clone https://github.com/Zerus97/simulador_ride_hailing.git`
+ 
+Clone o repositório, entre no diretório do projeto e instale as dependências:
+
+```bash
+git clone https://github.com/Zerus97/simulador_ride_hailing.git
+cd simulador_ride_hailing
+pip install numpy
+```
 
 -----
 
@@ -17,15 +24,19 @@ Para instalar basta rodar o comando:
 ### 2\. Testar o funcionanamento do simulador
 
 Para testar o funcionamento do simulador execute:
-`python3 simulador.py`
+```bash
+python3 simulador.py
+```
 
 A mensagem de simulador criado seguido das métricas de avaliação devem aparecer.
 
 ### 3\. Escolhendo o baseline
 
 Dentro do simulador, existem dois baselines de algoritmos de reposicionamento disponíveis:
-- SemMovimento(Carros não se mexem enquanto ociosos)
-- HotSpot(Carros se movem em direção a zona vizinha com mais pedidos)
+| Baseline | Comportamento |
+|----------|---------------|
+| **SemMovimento** | Os carros permanecem parados enquanto estão ociosos. |
+| **HotSpot** | Os carros se movem em direção à zona vizinha com o maior número de pedidos. |
 
 ### 4\. Criando seu próprio algoritmo
 
