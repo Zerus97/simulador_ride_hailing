@@ -43,4 +43,4 @@ Este método recebe como input:
 - pedidos: {(zona): numero de pedidos, (0,1): 2}
 - grade: Uma instancia da grade do simulador
 
-O retorno deste método deve ser um dicionário contendo cada veículo a ser reposicionado(seu id) e a zona para qual deve ir no formado (i, j).
+O retorno deste método deve ser um dicionário contendo cada veículo a ser reposicionado(seu id) e a zona para qual zona deve ir no formado (i, j).
