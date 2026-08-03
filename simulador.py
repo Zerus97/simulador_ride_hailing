@@ -1,13 +1,11 @@
-# simulador.py — versao minima (incremento 1)
-# Objetivo: montar o esqueleto que roda "vazio":
-# uma grade de zonas, alguns veiculos, e um laco de tempo.
+# simulador.py — versao minima
 
 import random
 import numpy as np
 from collections import Counter
 
 class AlgoritmoReposicionamento: # Classe de algoritmos de reposicionamento
-    def decidir(self):
+    def decidir(self, veiculos_ociosos, corridas_ativas, pedidos, grade):
         ...
 
 class SemMovimento(AlgoritmoReposicionamento):
@@ -246,8 +244,8 @@ class Simulador:
 if __name__ == "__main__":
     random.seed(0)  # fixa a aleatoriedade para o resultado ser sempre igual
     grade = Grade(size=10)                 # cidade 5x5 = 25 zonas
-    # algoritmo = SemMovimento()
-    algoritmo = Hotspot()
+    algoritmo = SemMovimento()
+    # algoritmo = Hotspot()
     sim = Simulador(grade, num_veiculos=40, lam=0.40, algoritmo=algoritmo)
     print(f"Simulador criado: {len(grade.zonas())} zonas, {len(sim.veiculos)} veiculos")
     sim.rodar(passos=500)
