@@ -1,2 +1,2 @@
-# Simulador de Ride-Hailing
-
+# Simulador de Ride-Hailing para Algoritmos de reposicionamento
+Este programa foi pensado para avalair os diferentes tipos de algoritmos de reposicionamento dentro de um ambiente unificado possibilitando a comparação entre as diferentes soluções existentes.
