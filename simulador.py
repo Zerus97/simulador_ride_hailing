@@ -252,5 +252,3 @@ if __name__ == "__main__":
     print(f"Simulador criado: {len(grade.zonas())} zonas, {len(sim.veiculos)} veiculos")
     sim.rodar(passos=500)
     sim.metrics()
-    # sim.mostrar()
-    # sim.mostrar_v2()
