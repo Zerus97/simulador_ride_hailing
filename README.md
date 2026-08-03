@@ -38,8 +38,8 @@ class MeuAlgoritmo(AlgoritmoReposicionamento):
         return d
 ```
 Este método recebe como input:
-veiculos_ociosos: [(id_veiculo, (zona)), (6, (7,4))]
-corridas_ativas: ({(zona_destino) : numero de carros, (6,1): 4})
-pedidos: {(zona): numero de pedidos, (0,1): 2}
-grade: Uma instancia da grade do simulador
+- veiculos_ociosos: [(id_veiculo, (zona)), (6, (7,4))]
+- corridas_ativas: ({(zona_destino) : numero de carros, (6,1): 4})
+- pedidos: {(zona): numero de pedidos, (0,1): 2}
+- grade: Uma instancia da grade do simulador
 O retorno deste método deve ser um dicionário contendo cada veículo a ser reposicionado(seu id) e a zona para qual deve ir no formado (i, j).
