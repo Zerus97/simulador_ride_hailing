@@ -58,3 +58,15 @@ Este método recebe como input:
 | `grade` | Instância da grade do simulador. | — |
 
 O retorno deste método deve ser um dicionário onde cada chave representa o id do veiculo a ser reposicionado(seu id) e a zona para qual zona deve ir no formado (i, j).
+
+### 5\. Métricas
+
+Para análisar a performance dos algoritmos o simulador dispões das seguintes métricas:
+| Métrica | Descrição |
+|---------|-----------|
+| `Pedidos Atendidos` | Número de pedidos atendidos sobre o total de pedidos |
+| `Pedidos Totais` | Número total de pedidos |
+| `Pedidos Expirados` | Número total de pedidos que expiraram por falta de veículo |
+| `Taxa de Pedidos Expirados` | Número de pedidos expirados sobre o total de pedidos |
+| `Corridas Completadas` | Número de corridas finalizadas(não contabiliza corridas em andamento) |
+| `Taxa de Ociosidade` | Número de veículos ociosos sobre o total de veículos acumulando a cada timestep t |
