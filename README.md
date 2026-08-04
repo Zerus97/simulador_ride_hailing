@@ -64,6 +64,15 @@ Este método recebe como input:
 
 O retorno deste método deve ser um dicionário onde cada chave representa o id do veiculo a ser reposicionado(seu id) e a zona para qual zona deve ir no formado (i, j).
 
+Depois, é só incluir seu algoritmo dentro do dicionário:
+```bash
+    ALGORITMOS = {
+    "sem_movimento": SemMovimento,
+    "hotspot": Hotspot,
+    #"meu_algoritmo" : MeuAlgoritmo
+    }
+```
+
 ### 5\. Métricas
 
 Para análisar a performance dos algoritmos o simulador dispões das seguintes métricas:
