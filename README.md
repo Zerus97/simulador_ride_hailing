@@ -25,7 +25,7 @@ pip install numpy
 
 Para testar o funcionamento do simulador execute:
 ```bash
-python3 simulador.py
+python3 simulador.py --size 10 --veiculos 40 --lam 0.4 --passos 500
 ```
 
 A mensagem de simulador criado seguido das métricas de avaliação devem aparecer.
@@ -37,6 +37,11 @@ Dentro do simulador, existem dois baselines de algoritmos de reposicionamento di
 |----------|---------------|
 | **SemMovimento** | Os carros permanecem parados enquanto estão ociosos. |
 | **HotSpot** | Os carros se movem em direção à zona vizinha com o maior número de pedidos. |
+
+Para selecionar o HotSpot basta executar o seguinte:
+```bash
+python3 simulador.py --algoritmo hotspot --size 10 --veiculos 40 --lam 0.4 --passos 500
+```
 
 ### 4\. Criando seu próprio algoritmo
 
