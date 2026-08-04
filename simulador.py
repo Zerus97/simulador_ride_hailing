@@ -3,6 +3,7 @@
 import random
 import numpy as np
 from collections import Counter
+import argparse
 
 class AlgoritmoReposicionamento: # Classe de algoritmos de reposicionamento
     def decidir(self, veiculos_ociosos, corridas_ativas, pedidos, grade):
@@ -242,11 +243,30 @@ class Simulador:
 
 
 if __name__ == "__main__":
+    ALGORITMOS = {
+    "sem_movimento": SemMovimento,
+    "hotspot": Hotspot,
+    #"meu_algoritmo" : MeuAlgoritmo
+    }
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--size", type=int, default=5)
+    parser.add_argument("--veiculos", type=int, default=10)
+    parser.add_argument("--lam", type=float, default=0.4)
+    parser.add_argument("--passos", type=int, default=100)
+    parser.add_argument(
+    "--algoritmo",
+    choices=ALGORITMOS.keys(),
+    default="sem_movimento",
+    help="Algoritmo de reposicionamento"
+)
+
+    args = parser.parse_args()
+    algoritmo = ALGORITMOS[args.algoritmo]()
+
     random.seed(0)  # fixa a aleatoriedade para o resultado ser sempre igual
-    grade = Grade(size=10)                 # cidade 5x5 = 25 zonas
-    algoritmo = SemMovimento()
-    # algoritmo = Hotspot()
-    sim = Simulador(grade, num_veiculos=40, lam=0.40, algoritmo=algoritmo)
+    grade = Grade(size=args.size)                 # Exemplo cidade 5x5 = 25 zonas
+    sim = Simulador(grade, num_veiculos=args.veiculos, lam=args.lam, algoritmo=algoritmo)
     print(f"Simulador criado: {len(grade.zonas())} zonas, {len(sim.veiculos)} veiculos")
-    sim.rodar(passos=500)
+    sim.rodar(passos=args.passos)
     sim.metrics()
