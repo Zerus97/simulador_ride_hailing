@@ -239,9 +239,6 @@ class Simulador:
             if v.ocioso == ociosos
         ]
     
-
-
-
 if __name__ == "__main__":
     ALGORITMOS = {
     "sem_movimento": SemMovimento,

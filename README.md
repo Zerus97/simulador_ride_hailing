@@ -30,15 +30,21 @@ python3 simulador.py --size 10 --veiculos 40 --lam 0.4 --passos 500
 
 A mensagem de simulador criado seguido das métricas de avaliação devem aparecer.
 
-### 3\. Escolhendo o baseline
+### 3\. Escolhendo os parametros
 
 Dentro do simulador, existem dois baselines de algoritmos de reposicionamento disponíveis:
 | Baseline | Comportamento |
 |----------|---------------|
-| **SemMovimento** | Os carros permanecem parados enquanto estão ociosos. |
-| **HotSpot** | Os carros se movem em direção à zona vizinha com o maior número de pedidos. |
+| **sem_movimento** | Os carros permanecem parados enquanto estão ociosos. |
+| **hotspot** | Os carros se movem em direção à zona vizinha com o maior número de pedidos. |
 
-Para selecionar o HotSpot basta executar o seguinte:
+Além disso você deve selecionar:
+- O tamanho do grid quadrado que deseja em um número inteiro.
+- O número de veículos disponíveis
+- A média da distribuição de poisson
+- O número de passos do simulador
+
+Exemplo de execução usando o baseline Hotspot:
 ```bash
 python3 simulador.py --algoritmo hotspot --size 10 --veiculos 40 --lam 0.4 --passos 500
 ```
