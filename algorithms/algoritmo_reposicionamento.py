@@ -1,0 +1,3 @@
+class AlgoritmoReposicionamento: # Classe de algoritmos de reposicionamento
+    def decidir(self, veiculos_ociosos, corridas_ativas, pedidos, grade):
+        ...
