@@ -127,9 +127,15 @@ class Simulador:
             print(" ".join(linha))
 
     def metrics(self):
-        taxa_atendimento = (len(self.corridas_ativas) + len(self.corridas_concluidas)) / (self.total_pedidos)
+        if self.total_pedidos == 0:
+            taxa_atendimento = float("nan")
+        else:
+            taxa_atendimento = (len(self.corridas_ativas) + len(self.corridas_concluidas)) / (self.total_pedidos)
         corridas_completadas = len(self.corridas_concluidas)
-        taxa_ociosidade = self.ociosidades / (self.tempo * len(self.veiculos))
+        if len(self.veiculos) == 0:
+            taxa_ociosidade = float("nan")
+        else:
+            taxa_ociosidade = self.ociosidades / (self.tempo * len(self.veiculos))
         return {
             "taxa_atendimento": taxa_atendimento,
             "pedidos_totais": self.total_pedidos,
