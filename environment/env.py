@@ -1,5 +1,3 @@
-import uuid
-
 class Grade: # Mudar para hexagonos
     """A cidade dividida em zonas, numa grade quadrada size x size."""
 
@@ -36,8 +34,8 @@ class Veiculo:
 
 class Pedido: # Custo precisa ser calculado baseado na distancia entre origem e destino
     """Um pedido que tem uma origem, destino e custo"""
-    def __init__(self, cliente, origem, destino, custo, timestep):
-        self.id = str(uuid.uuid4())
+    def __init__(self, id, cliente, origem, destino, custo, timestep):
+        self.id = id
         self.cliente = cliente
         self.origem = origem
         self.destino = destino

@@ -6,7 +6,10 @@ class Simulador:
     """Junta a grade e os veiculos, e faz o tempo avancar em passos."""
 
     def __init__(self, grade, num_veiculos, lam, algoritmo, seed=None): # Como definir o lam de forma que represente melhor a realidade?
-        self.rng = np.random.default_rng(seed)
+        sementes = np.random.SeedSequence(seed).spawn(3)
+        self.rng_inicial = np.random.default_rng(sementes[0])
+        self.rng_demanda = np.random.default_rng(sementes[1])
+        self.rng_aceite  = np.random.default_rng(sementes[2]) 
         self.grade = grade
         self.tempo = 0
         self.lam = lam
@@ -14,28 +17,30 @@ class Simulador:
         self.corridas_ativas = []
         self.corridas_concluidas = []
         self.algoritmo = algoritmo
+        self.proximo_id_pedido = 1
         # espalha os veiculos em zonas aleatorias da grade
         zonas = grade.zonas()
         self.ociosidades = 0
         self.total_pedidos = 0
         self.pedidos_expirados = 0
         self.veiculos = [
-            Veiculo(v, self.escolher(zonas)) for v in range(num_veiculos)
+            Veiculo(v, self.escolher(zonas, self.rng_inicial)) for v in range(num_veiculos)
         ]
 
-    def escolher(self, opcoes):
-        """Escolhe um elemento aleatorio da lista usando o gerador do simulador."""
-        return opcoes[self.rng.integers(len(opcoes))]
+    def escolher(self, opcoes, rng):
+        """Escolhe um elemento aleatorio da lista usando o gerador informado."""
+        return opcoes[rng.integers(len(opcoes))]
 
     def demanda(self):
         num_pedidos = 0
         zonas = self.grade.zonas()
         for i in range(self.grade.size):
             for j in range(self.grade.size):
-                num_pedidos = int(self.rng.poisson(self.lam))
+                num_pedidos = int(self.rng_demanda.poisson(self.lam))
                 self.total_pedidos += num_pedidos
                 for k in range(num_pedidos):
-                    self.pedidos[i][j].append(Pedido(None, (i, j), self.escolher([z for z in zonas if z != (i, j)]), k + 1, self.tempo))
+                    self.pedidos[i][j].append(Pedido(self.proximo_id_pedido, None, (i, j), self.escolher([z for z in zonas if z != (i, j)], self.rng_demanda), k + 1, self.tempo))
+                    self.proximo_id_pedido += 1
         
 
     def matching(self):
@@ -122,11 +127,11 @@ class Simulador:
             print(" ".join(linha))
 
     def metrics(self):
-        pedidos_atendidos = (len(self.corridas_ativas) + len(self.corridas_concluidas)) / (self.total_pedidos)
+        taxa_atendimento = (len(self.corridas_ativas) + len(self.corridas_concluidas)) / (self.total_pedidos)
         corridas_completadas = len(self.corridas_concluidas)
         taxa_ociosidade = self.ociosidades / (self.tempo * len(self.veiculos))
         return {
-            "pedidos_atendidos": pedidos_atendidos,
+            "taxa_atendimento": taxa_atendimento,
             "pedidos_totais": self.total_pedidos,
             "pedidos_expirados": self.pedidos_expirados,
             "taxa_pedidos_expirados": self.pedidos_expirados / self.total_pedidos,
