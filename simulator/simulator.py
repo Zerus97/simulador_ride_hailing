@@ -1,12 +1,12 @@
 from collections import Counter
 import numpy as np
-import random
 from environment.env import Veiculo, Pedido, Corrida
 
 class Simulador:
     """Junta a grade e os veiculos, e faz o tempo avancar em passos."""
 
-    def __init__(self, grade, num_veiculos, lam, algoritmo): # Como definir o lam de forma que represente melhor a realidade?
+    def __init__(self, grade, num_veiculos, lam, algoritmo, seed=None): # Como definir o lam de forma que represente melhor a realidade?
+        self.rng = np.random.default_rng(seed)
         self.grade = grade
         self.tempo = 0
         self.lam = lam
@@ -20,18 +20,22 @@ class Simulador:
         self.total_pedidos = 0
         self.pedidos_expirados = 0
         self.veiculos = [
-            Veiculo(v, random.choice(zonas)) for v in range(num_veiculos)
+            Veiculo(v, self.escolher(zonas)) for v in range(num_veiculos)
         ]
+
+    def escolher(self, opcoes):
+        """Escolhe um elemento aleatorio da lista usando o gerador do simulador."""
+        return opcoes[self.rng.integers(len(opcoes))]
 
     def demanda(self):
         num_pedidos = 0
         zonas = self.grade.zonas()
         for i in range(self.grade.size):
             for j in range(self.grade.size):
-                num_pedidos = np.random.poisson(self.lam)
+                num_pedidos = int(self.rng.poisson(self.lam))
                 self.total_pedidos += num_pedidos
                 for k in range(num_pedidos):
-                    self.pedidos[i][j].append(Pedido(None, (i, j), random.choice([z for z in zonas if z != (i, j)]), k + 1, self.tempo))
+                    self.pedidos[i][j].append(Pedido(None, (i, j), self.escolher([z for z in zonas if z != (i, j)]), k + 1, self.tempo))
         
 
     def matching(self):
@@ -121,12 +125,14 @@ class Simulador:
         pedidos_atendidos = (len(self.corridas_ativas) + len(self.corridas_concluidas)) / (self.total_pedidos)
         corridas_completadas = len(self.corridas_concluidas)
         taxa_ociosidade = self.ociosidades / (self.tempo * len(self.veiculos))
-        print(f"Pedidos Atendidos: {pedidos_atendidos}, "
-              f"Pedidos Totais {self.total_pedidos}, "
-              f"Pedidos Expirados {self.pedidos_expirados}, "
-              f"Taxa de Pedidos Expirados {self.pedidos_expirados / self.total_pedidos}, " 
-              f"Corridas Completadas: {corridas_completadas}, "
-              f"Taxa de Ociosidade: {taxa_ociosidade}")
+        return {
+            "pedidos_atendidos": pedidos_atendidos,
+            "pedidos_totais": self.total_pedidos,
+            "pedidos_expirados": self.pedidos_expirados,
+            "taxa_pedidos_expirados": self.pedidos_expirados / self.total_pedidos,
+            "corridas_completadas": corridas_completadas,
+            "taxa_ociosidade": taxa_ociosidade,
+        }
 
     def contar_pedidos_por_zona(self):
             return {
