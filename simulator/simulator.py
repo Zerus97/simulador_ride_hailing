@@ -126,21 +126,22 @@ class Simulador:
                 linha.append(f"{celula:>4}")
             print(" ".join(linha))
 
+    def taxa(self, numerator, denominator):
+        if denominator == 0:
+            return float("nan")
+        else:
+            return numerator / denominator
+
     def metrics(self):
-        if self.total_pedidos == 0:
-            taxa_atendimento = float("nan")
-        else:
-            taxa_atendimento = (len(self.corridas_ativas) + len(self.corridas_concluidas)) / (self.total_pedidos)
+        taxa_atendimento = self.taxa(len(self.corridas_ativas) + len(self.corridas_concluidas), (self.total_pedidos))
         corridas_completadas = len(self.corridas_concluidas)
-        if len(self.veiculos) == 0:
-            taxa_ociosidade = float("nan")
-        else:
-            taxa_ociosidade = self.ociosidades / (self.tempo * len(self.veiculos))
+        taxa_ociosidade = self.taxa(self.ociosidades, (self.tempo * len(self.veiculos)))
+        taxa_pedidos_expirados = self.taxa(self.pedidos_expirados, self.total_pedidos)
         return {
             "taxa_atendimento": taxa_atendimento,
             "pedidos_totais": self.total_pedidos,
             "pedidos_expirados": self.pedidos_expirados,
-            "taxa_pedidos_expirados": self.pedidos_expirados / self.total_pedidos,
+            "taxa_pedidos_expirados": taxa_pedidos_expirados,
             "corridas_completadas": corridas_completadas,
             "taxa_ociosidade": taxa_ociosidade,
         }
