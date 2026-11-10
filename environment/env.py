@@ -34,8 +34,8 @@ class Veiculo:
 
 class Pedido: # Custo precisa ser calculado baseado na distancia entre origem e destino
     """Um pedido que tem uma origem, destino e custo"""
-    def __init__(self, id, cliente, origem, destino, custo, timestep):
-        self.id = id
+    def __init__(self, id_pedido, cliente, origem, destino, custo, timestep):
+        self.id_pedido = id
         self.cliente = cliente
         self.origem = origem
         self.destino = destino
