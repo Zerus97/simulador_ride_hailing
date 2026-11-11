@@ -40,7 +40,8 @@ class Pedido: # Custo precisa ser calculado baseado na distancia entre origem e 
         self.origem = origem
         self.destino = destino
         self.custo = custo
-        self.expira = timestep + 2
+        self.criado_em = timestep
+        self.expira = self.criado_em + 2
     
     def __repr__(self):
         return (f"Pedido(id={self.id}, "

@@ -14,6 +14,7 @@ class Simulador:
         self.tempo = 0
         self.lam = lam
         self.pedidos = [[[] for _ in range(self.grade.size)] for _ in range(self.grade.size)]
+        self.historico_pedidos = []
         self.corridas_ativas = []
         self.corridas_concluidas = []
         self.algoritmo = algoritmo
@@ -41,6 +42,7 @@ class Simulador:
                 for k in range(num_pedidos):
                     self.pedidos[i][j].append(Pedido(self.proximo_id_pedido, None, (i, j), self.escolher([z for z in zonas if z != (i, j)], self.rng_demanda), k + 1, self.tempo))
                     self.proximo_id_pedido += 1
+                    self.historico_pedidos.append(self.pedidos[i][j])
         
 
     def matching(self):
