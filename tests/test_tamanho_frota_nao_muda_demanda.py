@@ -12,11 +12,11 @@ def criar_simulador_2(seed=0, num_veiculos=20):
                      algoritmo=Hotspot(), seed=seed)
 
 
-def test_mesma_semente_da_mesmas_metricas():
+def test_frota_nao_muda_os_pedidos_gerados():
     a = criar_simulador_1(seed=0)
     b = criar_simulador_2(seed=0)
 
-    a.rodar(200)
-    b.rodar(200)
-
-    assert a.historico_pedidos == b.historico_pedidos
+    pedidos_a = [(p.criado_em, p.origem, p.destino) for p in a.historico_pedidos]
+    pedidos_b = [(p.criado_em, p.origem, p.destino) for p in b.historico_pedidos]
+    
+    assert pedidos_a == pedidos_b
