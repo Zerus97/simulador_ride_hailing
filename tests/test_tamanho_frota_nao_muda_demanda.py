@@ -16,6 +16,9 @@ def test_frota_nao_muda_os_pedidos_gerados():
     a = criar_simulador_1(seed=0)
     b = criar_simulador_2(seed=0)
 
+    a.rodar(200)
+    b.rodar(200)
+
     pedidos_a = [(p.criado_em, p.origem, p.destino) for p in a.historico_pedidos]
     pedidos_b = [(p.criado_em, p.origem, p.destino) for p in b.historico_pedidos]
     
