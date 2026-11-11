@@ -47,6 +47,14 @@ class Pedido: # Custo precisa ser calculado baseado na distancia entre origem e 
         return (f"Pedido(id={self.id}, "
                 f"{self.origem}->{self.destino}, "
                 f"custo={self.custo})")
+
+    def __eq__(self, outro):
+        if not isinstance(outro, Pedido):
+            return False
+        return (self.id == outro.id and 
+                self.origem == outro.origem and 
+                self.destino == outro.destino and 
+                self.expira == outro.expira)
     
 class Corrida: # Como calcular horário de chegada?
     """Um corrida que tem um veículo e um pedido a ser atendido"""

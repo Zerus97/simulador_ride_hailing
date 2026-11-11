@@ -40,9 +40,10 @@ class Simulador:
                 num_pedidos = int(self.rng_demanda.poisson(self.lam))
                 self.total_pedidos += num_pedidos
                 for k in range(num_pedidos):
-                    self.pedidos[i][j].append(Pedido(self.proximo_id_pedido, None, (i, j), self.escolher([z for z in zonas if z != (i, j)], self.rng_demanda), k + 1, self.tempo))
+                    novo_pedido = Pedido(self.proximo_id_pedido, None, (i, j), self.escolher([z for z in zonas if z != (i, j)], self.rng_demanda), k + 1, self.tempo)
+                    self.pedidos[i][j].append(novo_pedido)
+                    self.historico_pedidos.append(novo_pedido) # <--- Salva apenas a instância
                     self.proximo_id_pedido += 1
-                    self.historico_pedidos.append(self.pedidos[i][j])
         
 
     def matching(self):
