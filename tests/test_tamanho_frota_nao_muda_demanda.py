@@ -22,4 +22,4 @@ def test_frota_nao_muda_os_pedidos_gerados():
     pedidos_a = [(p.criado_em, p.origem, p.destino) for p in a.historico_pedidos]
     pedidos_b = [(p.criado_em, p.origem, p.destino) for p in b.historico_pedidos]
     
-    assert pedidos_a == pedidos_b
+    assert pedidos_a == pedidos_b and len(pedidos_a) > 0

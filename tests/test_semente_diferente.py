@@ -8,7 +8,7 @@ def criar_simulador(seed=0, num_veiculos=10):
                      algoritmo=Hotspot(), seed=seed)
 
 
-def test_mesma_semente_da_mesmas_metricas():
+def test_semente_diferente_da_diferente_metricas():
     a = criar_simulador(seed=0)
     b = criar_simulador(seed=1)
 
