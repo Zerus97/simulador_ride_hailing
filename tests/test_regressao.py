@@ -1,6 +1,6 @@
 import pytest
 
-from environment.env import Grade
+from environment.env import GradeQuadrada
 from simulator.simulator import Simulador
 from algorithms.hotspot import Hotspot
 from algorithms.sem_movimento import SemMovimento
@@ -29,7 +29,7 @@ from algorithms.sem_movimento import SemMovimento
     }),
 ])
 def test_metricas_de_referencia(algoritmo, esperado):
-    sim = Simulador(Grade(5), num_veiculos=10, lam=0.4,
+    sim = Simulador(GradeQuadrada(5), num_veiculos=10, lam=0.4,
                     algoritmo=algoritmo(), seed=0)
 
     sim.rodar(500)

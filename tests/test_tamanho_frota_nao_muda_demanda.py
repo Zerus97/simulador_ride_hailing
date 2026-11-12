@@ -1,14 +1,14 @@
-from environment.env import Grade
+from environment.env import GradeQuadrada
 from simulator.simulator import Simulador
 from algorithms.hotspot import Hotspot
 
 
 def criar_simulador_1(seed=0, num_veiculos=10):
-    return Simulador(Grade(5), num_veiculos=num_veiculos, lam=0.4,
+    return Simulador(GradeQuadrada(5), num_veiculos=num_veiculos, lam=0.4,
                      algoritmo=Hotspot(), seed=seed)
 
 def criar_simulador_2(seed=0, num_veiculos=20):
-    return Simulador(Grade(5), num_veiculos=num_veiculos, lam=0.4,
+    return Simulador(GradeQuadrada(5), num_veiculos=num_veiculos, lam=0.4,
                      algoritmo=Hotspot(), seed=seed)
 
 

@@ -1,7 +1,7 @@
 from algorithms.hotspot import Hotspot
 from algorithms.sem_movimento import SemMovimento
 import argparse
-from environment.env import Grade
+from environment.env import GradeQuadrada
 from simulator.simulator import Simulador
 
 if __name__ == "__main__":
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     algoritmo = ALGORITMOS[args.algoritmo]()
 
-    grade = Grade(size=args.size)                 # Exemplo cidade 5x5 = 25 zonas
+    grade = GradeQuadrada(size=args.size)                 # Exemplo cidade 5x5 = 25 zonas
     sim = Simulador(grade, num_veiculos=args.veiculos, lam=args.lam, algoritmo=algoritmo, seed=args.seed)
     print(f"Simulador criado: {len(grade.zonas())} zonas, {len(sim.veiculos)} veiculos")
     sim.rodar(passos=args.passos)

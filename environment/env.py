@@ -1,4 +1,4 @@
-class Grade: # Mudar para hexagonos
+class GradeQuadrada: # Mudar para hexagonos
     """A cidade dividida em zonas, numa grade quadrada size x size."""
 
     def __init__(self, size):

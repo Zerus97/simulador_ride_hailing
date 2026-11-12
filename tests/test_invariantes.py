@@ -1,6 +1,6 @@
 import pytest
 
-from environment.env import Grade
+from environment.env import GradeQuadrada
 from simulator.simulator import Simulador
 from algorithms.hotspot import Hotspot
 from algorithms.sem_movimento import SemMovimento
@@ -11,7 +11,7 @@ SEMENTES = [0, 1, 2]
 
 
 def criar_simulador(algoritmo, seed, num_veiculos=10):
-    return Simulador(Grade(5), num_veiculos=num_veiculos, lam=0.4,
+    return Simulador(GradeQuadrada(5), num_veiculos=num_veiculos, lam=0.4,
                      algoritmo=algoritmo(), seed=seed)
 
 
