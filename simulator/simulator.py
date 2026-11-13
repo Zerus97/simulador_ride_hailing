@@ -104,30 +104,6 @@ class Simulador:
     def rodar(self, passos):
         for _ in range(passos):
             self.passo()
-            # self.mostrar()
-
-    def mostrar(self):
-        print(f"t={self.tempo}")
-        for i in range(self.grade.size):
-            for j in range(self.grade.size):
-                zona = (i, j)
-                veiculos_na_zona = [v.id for v in self.veiculos if v.zona == zona]
-                pedidos_na_zona = len(self.pedidos[i][j])
-                corridas_na_zona = [c for c in self.corridas_ativas if c.pedido.origem == zona]
-                print(f"Zona {zona}: Veiculos {veiculos_na_zona} Pedidos {pedidos_na_zona} Corridas {corridas_na_zona}")
-
-    def mostrar_v2(self):
-        ocupacao = {}
-        for v in self.veiculos:
-            ocupacao.setdefault(v.zona, []).append(v.id)
-
-        for i in range(self.grade.size):
-            linha = []
-            for j in range(self.grade.size):
-                ids = ocupacao.get((i, j), [])
-                celula = ",".join(str(id_) for id_ in ids) if ids else "."
-                linha.append(f"{celula:>4}")
-            print(" ".join(linha))
 
     def taxa(self, numerator, denominator):
         if denominator == 0:
