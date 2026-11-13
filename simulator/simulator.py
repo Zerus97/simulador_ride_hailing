@@ -1,4 +1,4 @@
-from collections import Counter
+from collections import Counter, deque
 import numpy as np
 from environment.env import Veiculo, Pedido, Corrida
 
@@ -13,7 +13,7 @@ class Simulador:
         self.grade = grade
         self.tempo = 0
         self.lam = lam
-        self.pedidos = [[[] for _ in range(self.grade.size)] for _ in range(self.grade.size)]
+        self.pedidos = {zona: deque() for zona in self.grade.zonas()}
         self.historico_pedidos = []
         self.corridas_ativas = []
         self.corridas_concluidas = []
@@ -33,27 +33,23 @@ class Simulador:
         return opcoes[rng.integers(len(opcoes))]
 
     def demanda(self):
-        num_pedidos = 0
         zonas = self.grade.zonas()
-        for i in range(self.grade.size):
-            for j in range(self.grade.size):
-                num_pedidos = int(self.rng_demanda.poisson(self.lam))
-                self.total_pedidos += num_pedidos
-                for k in range(num_pedidos):
-                    novo_pedido = Pedido(self.proximo_id_pedido, None, (i, j), self.escolher([z for z in zonas if z != (i, j)], self.rng_demanda), k + 1, self.tempo)
-                    self.pedidos[i][j].append(novo_pedido)
-                    self.historico_pedidos.append(novo_pedido) # <--- Salva apenas a instância
-                    self.proximo_id_pedido += 1
-        
+        for zona in zonas:
+            num_pedidos = int(self.rng_demanda.poisson(self.lam))
+            self.total_pedidos += num_pedidos
+            for k in range(num_pedidos):
+                novo_pedido = Pedido(self.proximo_id_pedido, None, zona, self.escolher([z for z in zonas if z != zona], self.rng_demanda), k + 1, self.tempo)
+                self.pedidos[zona].append(novo_pedido)
+                self.historico_pedidos.append(novo_pedido) # <--- Salva apenas a instância
+                self.proximo_id_pedido += 1
+
 
     def matching(self):
         for v in self.veiculos:
-            if v.ocioso:
-                i, j = v.zona
-                if self.pedidos[i][j]:
-                    v.ocioso = False
-                    self.corridas_ativas.append(Corrida(v, self.pedidos[i][j][0], self.tempo))
-                    self.pedidos[i][j].pop(0)
+            if v.ocioso and self.pedidos[v.zona]:
+                v.ocioso = False
+                pedido = self.pedidos[v.zona].popleft()
+                self.corridas_ativas.append(Corrida(v, pedido, self.tempo))
     
     def arrivals(self):
         restantes = []
@@ -73,15 +69,14 @@ class Simulador:
                 veiculo.zona = destino
 
     def expire(self):
-        for i in range(self.grade.size):
-            for j in range(self.grade.size):
-                novas_lista = []
-                for pedido in self.pedidos[i][j]:
-                    if pedido.expira > self.tempo:
-                        novas_lista.append(pedido)
-                    else:
-                        self.pedidos_expirados += 1
-                self.pedidos[i][j] = novas_lista
+        for zona, lista in self.pedidos.items():
+            nova_lista = deque()
+            for pedido in lista:
+                if pedido.expira > self.tempo:
+                    nova_lista.append(pedido)
+                else:
+                    self.pedidos_expirados += 1
+            self.pedidos[zona] = nova_lista
 
     def passo(self):
         self.tempo += 1
@@ -126,14 +121,10 @@ class Simulador:
         }
 
     def contar_pedidos_por_zona(self):
-            return {
-                (i, j): len(self.pedidos[i][j])
-                for i in range(self.grade.size)
-                for j in range(self.grade.size)
-            }
+        return {zona: len(lista) for zona, lista in self.pedidos.items()}
 
     def pedidos_abertos(self):
-        return [pedido for linha in self.pedidos for zona in linha for pedido in zona]
+        return [pedido for lista in self.pedidos.values() for pedido in lista]
 
     def contar_veiculos_por_zona_futura(self, ociosos=True):
         contagem = Counter()
