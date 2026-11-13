@@ -156,6 +156,9 @@ class Simulador:
                 for j in range(self.grade.size)
             }
 
+    def pedidos_abertos(self):
+        return [pedido for linha in self.pedidos for zona in linha for pedido in zona]
+
     def contar_veiculos_por_zona_futura(self, ociosos=True):
         contagem = Counter()
         for corrida in self.corridas_ativas:

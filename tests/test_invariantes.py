@@ -49,10 +49,8 @@ def test_nenhum_pedido_aberto_esta_expirado(algoritmo, seed):
     for _ in range(200):
         sim.passo()
 
-        for linha in sim.pedidos:
-            for pedidos_zona in linha:
-                for pedido in pedidos_zona:
-                    assert pedido.expira > sim.tempo, f"t={sim.tempo} {pedido}"
+        for pedido in sim.pedidos_abertos():
+            assert pedido.expira > sim.tempo, f"t={sim.tempo} {pedido}"
 
 
 @pytest.mark.parametrize("algoritmo", ALGORITMOS)

@@ -1,6 +1,6 @@
-from environment.grafo_zonas import GradeGen
+from environment.grafo_zonas import GrafoZonas
 
-class GradeQuadrada(GradeGen): # Mudar para hexagonos
+class GradeQuadrada(GrafoZonas): # Mudar para hexagonos
     """A cidade dividida em zonas, numa grade quadrada size x size."""
 
     def __init__(self, size):
