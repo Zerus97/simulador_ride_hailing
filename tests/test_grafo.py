@@ -46,6 +46,15 @@ def test_zona_nao_e_vizinha_de_si_mesma(grafo):
         assert z not in grafo.vizinhas(z), f"{z} aparece nas próprias vizinhas"
 
 
+def test_vizinhas_sao_zonas_do_grafo(grafo):
+    # Em grafos com zonas removidas (ex.: Manhattan), uma zona pode
+    # continuar apontando para uma vizinha que não existe mais.
+    zonas = set(grafo.zonas())
+    for z in zonas:
+        fora = set(grafo.vizinhas(z)) - zonas
+        assert not fora, f"{z} tem vizinhas que não são zonas do grafo: {fora}"
+
+
 def test_contagem_de_vizinhas_5x5(grafo):
     # 4 cantos com 3 vizinhas, 12 bordas com 5 e 9 zonas internas com 8
     contagem = Counter(len(grafo.vizinhas(z)) for z in grafo.zonas())
