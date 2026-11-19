@@ -20,12 +20,12 @@ from algorithms.sem_movimento import SemMovimento
         "taxa_ociosidade": 0.6846,
     }),
     (Hotspot, {
-        "taxa_atendimento": 0.5136391190139422,
+        "taxa_atendimento": 0.5393008688623965,
         "pedidos_totais": 4949,
-        "pedidos_expirados": 2387,
-        "taxa_pedidos_expirados": 0.4823196605374823,
-        "corridas_completadas": 2537,
-        "taxa_ociosidade": 0.4916,
+        "pedidos_expirados": 2263,
+        "taxa_pedidos_expirados": 0.4572640937563144,
+        "corridas_completadas": 2662,
+        "taxa_ociosidade": 0.4662,
     }),
 ])
 def test_metricas_de_referencia(algoritmo, esperado):

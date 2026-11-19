@@ -1,6 +1,6 @@
 from environment.grafo_zonas import GrafoZonas
 
-class GradeQuadrada(GrafoZonas): # Mudar para hexagonos
+class GradeQuadrada(GrafoZonas):
     """A cidade dividida em zonas, numa grade quadrada size x size."""
 
     def __init__(self, size):
@@ -11,10 +11,10 @@ class GradeQuadrada(GrafoZonas): # Mudar para hexagonos
         return [(i * self.size + j) for i in range(self.size) for j in range(self.size)]
 
     def vizinhas(self, zona):
-        """Zonas adjacentes (cima, baixo, esquerda, direita) dentro da grade."""
+        """Zonas adjacentes (cima, baixo, esquerda, direita e diagonais) dentro da grade."""
         i, j = divmod(zona, self.size)
         resultado = []
-        for di, dj in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+        for di, dj in [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]:
             ni, nj = i + di, j + dj
             if 0 <= ni < self.size and 0 <= nj < self.size:
                 resultado.append(ni * self.size + nj)
