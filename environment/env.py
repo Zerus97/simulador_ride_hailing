@@ -7,17 +7,17 @@ class GradeQuadrada(GrafoZonas): # Mudar para hexagonos
         self.size = size  # ex.: size=5  ->  cidade 5x5 = 25 zonas
 
     def zonas(self):
-        """Lista de todas as zonas, cada uma identificada por (linha, coluna)."""
-        return [(i, j) for i in range(self.size) for j in range(self.size)]
+        """Lista de todas as zonas, cada uma identificada por um id inteiro."""
+        return [(i * self.size + j) for i in range(self.size) for j in range(self.size)]
 
     def vizinhas(self, zona):
         """Zonas adjacentes (cima, baixo, esquerda, direita) dentro da grade."""
-        i, j = zona
+        i, j = divmod(zona, self.size)
         resultado = []
         for di, dj in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
             ni, nj = i + di, j + dj
             if 0 <= ni < self.size and 0 <= nj < self.size:
-                resultado.append((ni, nj))
+                resultado.append(ni * self.size + nj)
         return resultado
 
 
