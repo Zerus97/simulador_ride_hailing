@@ -1,7 +1,3 @@
-"""Preparação das viagens de táxi de Manhattan para o simulador.
-
-Os dados ficam em dataset/ (fora do git, pelo .gitignore).
-"""
 from pathlib import Path
 
 import numpy as np
@@ -76,8 +72,11 @@ def coordenadas_validas(df):
     return c.notna().all(axis=1) & c.ne(0).all(axis=1)
 
 
-def datas_no_mes(df):
-    return (df[COLUNAS_DATA] >= INICIO_MES).all(axis=1) & (df[COLUNAS_DATA] < FIM_MES).all(axis=1)
+def embarque_no_mes(df):
+    # Só o embarque: é ele que cria o pedido. Desembarques em abril são,
+    # em geral, corridas que cruzam a meia-noite de 31/03.
+    embarque = df["tpep_pickup_datetime"]
+    return (embarque >= INICIO_MES) & (embarque < FIM_MES)
 
 
 def distancia_positiva(df):
@@ -101,7 +100,7 @@ def desembarque_em_manhattan(df):
 # Por isso a etapa 6 conta exatamente as viagens que saem de Manhattan.
 ETAPAS = [
     ("coordenadas zeradas", coordenadas_validas),
-    ("datas fora de mar/2016", datas_no_mes),
+    ("embarque fora de mar/2016", embarque_no_mes),
     ("trip_distance <= 0", distancia_positiva),
     ("duração <= 0", duracao_positiva),
     ("embarque fora de Manhattan", embarque_em_manhattan),
