@@ -1,0 +1,9 @@
+.vscode
+enunciado.md
+exercicio_otimizado.py
+exercicio.py
+__pycache__/
+*.pyc
+testes.py
+dataset/
+.pytest_cache/
