@@ -1,10 +1,23 @@
+# Simulador
 numpy==2.5.1
+
+# Preparação dos dados (etl/)
+pandas==3.1.1
+pyarrow==26.0.1
+geopandas==1.2.0
+shapely==2.2.0
+pyproj==3.8.0
+matplotlib==3.11.2
+
+# Rede viária do OpenStreetMap (etl/osm.py)
+osmnx==2.2.0
+networkx==3.7
+scipy==1.18.1
+
+# Testes
+pytest==9.2.0
+
+# Ferramentas de instalação
 packaging==26.0
 setuptools==83.0.0
 wheel==0.47.0
-pytest
-pandas==3.1.1
-geopandas==1.2.0
-shapely==2.2.0
-pyarrow==26.0.1
-matplotlib==3.11.2

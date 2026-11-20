@@ -59,3 +59,14 @@ def test_grade_completa_igual_a_quadrada():
 def test_excluir_celula_inexistente_da_erro():
     with pytest.raises(ValueError):
         GradeCelulas(ESCADA, nao_vizinhos=[((1, 1), (9, 9))])
+
+
+def test_par_nao_adjacente_da_erro():
+    # (0, 0) e (2, 2) existem na escada, mas não são vizinhas
+    with pytest.raises(ValueError):
+        GradeCelulas(ESCADA, nao_vizinhos=[((0, 0), (2, 2))])
+
+
+def test_celula_repetida_da_erro():
+    with pytest.raises(ValueError):
+        GradeCelulas([(0, 0), (0, 0)])

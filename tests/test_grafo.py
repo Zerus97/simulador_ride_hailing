@@ -2,7 +2,8 @@ from collections import Counter
 
 import pytest
 
-from environment.env import GradeQuadrada
+from environment.env import GradeCelulas, GradeQuadrada
+from tests.test_grade_celulas import ESCADA
 
 
 # Grade 5x5, ids por linha:
@@ -28,11 +29,15 @@ def test_vizinhas_exemplos(zona, esperadas):
     assert set(g.vizinhas(zona)) == esperadas
 
 
-# --- Testes de propriedade: regras que valem para todas as zonas ---
+# --- Testes de propriedade: regras que valem para todas as zonas, em todo grafo ---
 
-@pytest.fixture
-def grafo():
-    return GradeQuadrada(5)
+@pytest.fixture(params=["quadrada_5x5", "escada", "escada_com_exclusao"])
+def grafo(request):
+    return {
+        "quadrada_5x5": lambda: GradeQuadrada(5),
+        "escada": lambda: GradeCelulas(ESCADA),
+        "escada_com_exclusao": lambda: GradeCelulas(ESCADA, nao_vizinhos=[((2, 2), (1, 1))]),
+    }[request.param]()
 
 
 def test_vizinhanca_simetrica(grafo):
@@ -55,7 +60,8 @@ def test_vizinhas_sao_zonas_do_grafo(grafo):
         assert not fora, f"{z} tem vizinhas que não são zonas do grafo: {fora}"
 
 
-def test_contagem_de_vizinhas_5x5(grafo):
-    # 4 cantos com 3 vizinhas, 12 bordas com 5 e 9 zonas internas com 8
+def test_contagem_de_vizinhas_5x5():
+    # só vale para a 5x5: 4 cantos com 3 vizinhas, 12 bordas com 5 e 9 zonas internas com 8
+    grafo = GradeQuadrada(5)
     contagem = Counter(len(grafo.vizinhas(z)) for z in grafo.zonas())
     assert contagem == {3: 4, 5: 12, 8: 9}
