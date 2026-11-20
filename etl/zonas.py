@@ -42,6 +42,23 @@ def poligono_manhattan():
     return contorno_latlon(zonas_manhattan())
 
 
+# Q5: a grade é montada em UTM zona 18N (metros), com células alinhadas ao norte
+# e origem no canto inferior esquerdo do contorno de Manhattan.
+CRS_GRADE = 32618
+
+
+@cache
+def contorno_metros():
+    """Contorno de Manhattan (sem as ilhas excluídas) em UTM 18N, em metros."""
+    return zonas_manhattan().to_crs(CRS_GRADE).union_all()
+
+
+def origem_grade():
+    """(x, y) do canto inferior esquerdo do contorno, em metros (UTM 18N)."""
+    minx, miny, _, _ = contorno_metros().bounds
+    return minx, miny
+
+
 def dentro(poligono, lon, lat):
     """True/False para cada ponto. Atenção: longitude (x) antes de latitude (y)."""
     return shapely.contains_xy(poligono, lon, lat)
@@ -64,3 +81,8 @@ if __name__ == "__main__":
     print(f"\n== zonas de Manhattan ({len(manhattan)} de {len(todas)}; "
           f"excluídas: {sorted(set(todas['LocationID']) - set(manhattan['LocationID']))}) ==")
     print(manhattan[["LocationID", "zone"]].to_string(index=False))
+
+    minx, miny, maxx, maxy = contorno_metros().bounds
+    print(f"\n== grade (EPSG:{CRS_GRADE}, metros, alinhada ao norte) ==")
+    print(f"origem (canto inferior esquerdo): x = {minx:,.1f}  y = {miny:,.1f}")
+    print(f"extensão: {maxx - minx:,.0f} m (leste-oeste) x {maxy - miny:,.0f} m (norte-sul)")
