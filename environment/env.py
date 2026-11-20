@@ -1,5 +1,10 @@
 from environment.grafo_zonas import GrafoZonas
 
+# Vizinhança das grades: cima, baixo, esquerda, direita e diagonais.
+# A ordem importa: é a ordem de vizinhas(), e o Hotspot desempata por ela.
+DIRECOES = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
+
+
 class GradeQuadrada(GrafoZonas):
     """A cidade dividida em zonas, numa grade quadrada size x size."""
 
@@ -14,11 +19,62 @@ class GradeQuadrada(GrafoZonas):
         """Zonas adjacentes (cima, baixo, esquerda, direita e diagonais) dentro da grade."""
         i, j = divmod(zona, self.size)
         resultado = []
-        for di, dj in [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]:
+        for di, dj in DIRECOES:
             ni, nj = i + di, j + dj
             if 0 <= ni < self.size and 0 <= nj < self.size:
                 resultado.append(ni * self.size + nj)
         return resultado
+
+
+class GradeCelulas(GrafoZonas):
+    """Grade com só as células que existem (ex.: as células de Manhattan com viagens).
+
+    celulas: (linha, coluna) de cada célula. Os ids das zonas são 0, 1, 2, ...
+        na ordem (linha, coluna) crescente, independente da ordem recebida.
+        Com todas as células de um quadrado n x n, os ids e as vizinhas saem
+        iguais aos da GradeQuadrada(n).
+    nao_vizinhos: pares de células adjacentes que NÃO são vizinhas (ex.: os
+        pares com mais de 15 min, como as travessias do Central Park). A
+        vizinhança é simétrica: o par (a, b) tira a->b e b->a.
+    """
+
+    def __init__(self, celulas, nao_vizinhos=()):
+        celulas = [tuple(c) for c in celulas]
+        if len(set(celulas)) != len(celulas):
+            raise ValueError("células repetidas")
+        self._celulas = sorted(celulas)
+        self._ids = {c: i for i, c in enumerate(self._celulas)}
+
+        bloqueados = set()
+        for a, b in nao_vizinhos:
+            a, b = tuple(a), tuple(b)
+            if a not in self._ids or b not in self._ids:
+                raise ValueError(f"par {a}-{b}: célula que não existe na grade")
+            if (b[0] - a[0], b[1] - a[1]) not in DIRECOES:
+                raise ValueError(f"par {a}-{b}: as células não são adjacentes")
+            bloqueados |= {(a, b), (b, a)}
+
+        self._vizinhas = [
+            [self._ids[(l + dl, c + dc)] for dl, dc in DIRECOES
+             if (l + dl, c + dc) in self._ids and ((l, c), (l + dl, c + dc)) not in bloqueados]
+            for l, c in self._celulas
+        ]
+
+    def zonas(self):
+        """Ids de todas as zonas: 0, 1, ..., n-1."""
+        return list(range(len(self._celulas)))
+
+    def vizinhas(self, zona):
+        """Ids das zonas vizinhas, na ordem de DIRECOES."""
+        return list(self._vizinhas[zona])
+
+    def celula(self, zona):
+        """(linha, coluna) da zona."""
+        return self._celulas[zona]
+
+    def zona(self, celula):
+        """Id da zona que corresponde à célula (linha, coluna)."""
+        return self._ids[tuple(celula)]
 
 
 class Veiculo:

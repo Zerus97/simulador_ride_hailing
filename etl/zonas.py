@@ -10,9 +10,11 @@ import shapely
 
 ARQUIVO_ZONAS = Path(__file__).resolve().parent.parent / "dataset" / "taxi_zones" / "taxi_zones.shp"
 
-# Ilhas sem acesso por carro: no OpenStreetMap não teriam rota para o resto
-# da cidade, e o cálculo dos tempos de viagem (tarefa 1.3) quebraria.
-EXCLUIDAS = ["Governor's Island/Ellis Island/Liberty Island"]
+# Zonas excluídas:
+# - Governor's/Ellis/Liberty: sem acesso por carro (sem rota no OpenStreetMap);
+# - Randalls Island: no máximo 0,072% das viagens, e o tempo até as vizinhas
+#   passa de 15 min, o que deixaria a ilha isolada no grafo de vizinhança.
+EXCLUIDAS = ["Governor's Island/Ellis Island/Liberty Island", "Randalls Island"]
 
 
 def ler_zonas(caminho=ARQUIVO_ZONAS):
@@ -25,6 +27,8 @@ def zonas_manhattan(zonas=None, excluir=EXCLUIDAS):
     if zonas is None:
         zonas = ler_zonas()
     manhattan = zonas[zonas["borough"] == "Manhattan"]
+    faltam = set(excluir) - set(manhattan["zone"])
+    assert not faltam, f"zonas inexistentes em EXCLUIDAS: {faltam}"
     return manhattan[~manhattan["zone"].isin(excluir)]
 
 
