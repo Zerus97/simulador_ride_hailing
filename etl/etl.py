@@ -4,9 +4,14 @@ Os dados ficam em dataset/ (fora do git, pelo .gitignore).
 """
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
-ARQUIVO = Path(__file__).resolve().parent.parent / "dataset" / "yellow_tripdata_2016-03.csv"
+from etl.zonas import EXCLUIDAS, contorno_latlon, dentro, ler_zonas, poligono_manhattan
+
+DATASET = Path(__file__).resolve().parent.parent / "dataset"
+ARQUIVO = DATASET / "yellow_tripdata_2016-03.csv"
+SAIDA = DATASET / "viagens_manhattan.parquet"
 
 # Item 1: das 19 colunas do arquivo, a preparação usa só estas 8.
 COLUNAS = [
@@ -53,6 +58,13 @@ def explorar(df):
     fora = (embarque.dt.year != 2016) | (embarque.dt.month != 3)
     print(f"fora de mar/2016: {fora.sum():,}")
 
+    zonas = ler_zonas()
+    ilhas = contorno_latlon(zonas[zonas["zone"].isin(EXCLUIDAS)])
+    print(f"\n== zona excluída ({', '.join(EXCLUIDAS)}) ==")
+    for ponta in ("pickup", "dropoff"):
+        n = dentro(ilhas, df[f"{ponta}_longitude"].values, df[f"{ponta}_latitude"].values).sum()
+        print(f"{ponta}s dentro: {n:,}")
+
 
 COORDENADAS = ["pickup_longitude", "pickup_latitude", "dropoff_longitude", "dropoff_latitude"]
 INICIO_MES = pd.Timestamp("2016-03-01")
@@ -76,13 +88,24 @@ def duracao_positiva(df):
     return duracao_min(df) > 0
 
 
+def embarque_em_manhattan(df):
+    return dentro(poligono_manhattan(), df["pickup_longitude"].values, df["pickup_latitude"].values)
+
+
+def desembarque_em_manhattan(df):
+    return dentro(poligono_manhattan(), df["dropoff_longitude"].values, df["dropoff_latitude"].values)
+
+
 # Etapas em ordem: (nome, função que devolve a máscara das linhas que FICAM).
 # Cada etapa conta só o que ela remove do que sobrou das anteriores.
+# Por isso a etapa 6 conta exatamente as viagens que saem de Manhattan.
 ETAPAS = [
     ("coordenadas zeradas", coordenadas_validas),
     ("datas fora de mar/2016", datas_no_mes),
     ("trip_distance <= 0", distancia_positiva),
     ("duração <= 0", duracao_positiva),
+    ("embarque fora de Manhattan", embarque_em_manhattan),
+    ("desembarque fora de Manhattan", desembarque_em_manhattan),
 ]
 
 
@@ -110,18 +133,48 @@ def limpar(df):
 def imprimir_relatorio(relatorio):
     print(relatorio.to_string(formatters={
         "removidas": "{:,}".format,
-        "% das lidas": "{:.2f}%".format,
+        "% das lidas": "{:.3f}%".format,
         "restantes": "{:,}".format,
     }))
 
 
+def desenhar(df, arquivo=None):
+    """Item 6: embarques de uma amostra, com a proporção corrigida para a
+    latitude de NY (1 grau de longitude ~ 3/4 de 1 grau de latitude)."""
+    import matplotlib.pyplot as plt
+
+    amostra = df.sample(min(50_000, len(df)), random_state=0)
+    plt.figure(figsize=(6, 9))
+    plt.scatter(amostra["pickup_longitude"], amostra["pickup_latitude"], s=0.5)
+    plt.gca().set_aspect(1 / np.cos(np.radians(40.75)))
+    plt.title("Embarques (amostra de 50 mil)")
+    if arquivo:
+        plt.savefig(arquivo, dpi=150, bbox_inches="tight")
+    else:
+        plt.show()
+
+
 if __name__ == "__main__":
-    import sys
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Limpeza e recorte de Manhattan.")
+    parser.add_argument("--explorar", action="store_true",
+                        help="só mostra as distribuições do CSV, sem limpar")
+    parser.add_argument("--desenhar", nargs="?", const="", metavar="PNG",
+                        help="desenha os embarques do Parquet já salvo (na tela ou num PNG)")
+    args = parser.parse_args()
+
+    if args.desenhar is not None:
+        desenhar(pd.read_parquet(SAIDA), args.desenhar or None)
+        raise SystemExit
 
     df = ler()
     print(df.dtypes.to_string(), "\n")
-    if "--explorar" in sys.argv:
+    if args.explorar:
         explorar(df)
-        sys.exit()
+        raise SystemExit
+
     viagens, relatorio = limpar(df)
     imprimir_relatorio(relatorio)
+    viagens.to_parquet(SAIDA, index=False)
+    print(f"\nSalvo em {SAIDA}")

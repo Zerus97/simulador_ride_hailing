@@ -3,3 +3,8 @@ packaging==26.0
 setuptools==83.0.0
 wheel==0.47.0
 pytest
+pandas==3.1.1
+geopandas==1.2.0
+shapely==2.2.0
+pyarrow==26.0.1
+matplotlib==3.11.2
