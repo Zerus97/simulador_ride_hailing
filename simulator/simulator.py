@@ -8,10 +8,13 @@ class Simulador:
     def __init__(self, grade, num_veiculos, demanda, algoritmo, seed=None):
         """demanda: a fonte de demanda (ex.: DemandaPoisson), que diz quais pedidos
         chegam a cada passo; ver simulator/demanda.py."""
-        sementes = np.random.SeedSequence(seed).spawn(3)
+        # Um gerador por fonte de acaso. Os filhos 0, 1 e 2 de spawn(4) são os mesmos
+        # de spawn(3): acrescentar o do matching não muda posições, demanda nem aceite.
+        sementes = np.random.SeedSequence(seed).spawn(4)
         self.rng_inicial = np.random.default_rng(sementes[0])
         self.rng_demanda = np.random.default_rng(sementes[1])
-        self.rng_aceite  = np.random.default_rng(sementes[2]) 
+        self.rng_aceite  = np.random.default_rng(sementes[2])
+        self.rng_matching = np.random.default_rng(sementes[3])
         self.grade = grade
         self.tempo = 0
         self.fonte_demanda = demanda
@@ -49,10 +52,31 @@ class Simulador:
 
 
     def matching(self):
-        for v in self.veiculos:
-            if v.estado == OCIOSO and self.pedidos[v.zona]:
+        """Liga carros ociosos a pedidos da mesma zona, com o motorista sorteado.
+
+        Sortear evita que os carros de id baixo fiquem sempre com a corrida, o que
+        distorceria a história de cada motorista (corridas feitas, aceite, ganhos).
+
+        A ordem dos sorteios é parte do contrato (a reprodutibilidade depende dela):
+        para cada zona, na ordem de grade.zonas(), com k = min(pedidos na fila, carros
+        ociosos) > 0, um único sorteio rng_matching.choice(len(livres), size=k,
+        replace=False), com os ociosos da zona em ordem de id. O 1º sorteado leva o
+        pedido mais antigo, o 2º o seguinte, e assim por diante."""
+        livres_por_zona = {}
+        for v in self.veiculos:  # ordem de id
+            if v.estado == OCIOSO:
+                livres_por_zona.setdefault(v.zona, []).append(v)
+
+        for zona in self.grade.zonas():
+            fila = self.pedidos[zona]
+            livres = livres_por_zona.get(zona, [])
+            k = min(len(fila), len(livres))
+            if k == 0:
+                continue
+            for i in self.rng_matching.choice(len(livres), size=k, replace=False):
+                v = livres[i]
                 v.estado = EM_CORRIDA
-                pedido = self.pedidos[v.zona].popleft()
+                pedido = fila.popleft()
                 self.corridas_ativas.append(Corrida(v, pedido, self.tempo))
     
     def arrivals(self):

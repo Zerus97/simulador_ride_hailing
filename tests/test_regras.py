@@ -5,6 +5,7 @@ pedidos e veículos colocados à mão, para controlar cada passo.
 Ordem dentro de passo(): tempo += 1, demanda, chegadas, expiração, matching,
 reposicionamento.
 """
+import numpy as np
 import pytest
 
 from algorithms.algoritmo_reposicionamento import AlgoritmoReposicionamento
@@ -244,3 +245,50 @@ def test_pedido_da_poisson_nao_tem_espera():
     sim.rodar(20)
     corridas = sim.corridas_ativas + sim.corridas_concluidas
     assert corridas and all(c.espera_min is None for c in corridas)
+
+
+# --- 1.6: matching com motorista sorteado ---
+
+def test_sorteio_do_motorista_e_justo():
+    # dois carros ociosos na mesma zona e um pedido: em 2.000 sementes, cada um atende
+    # ~1.000 vezes (desvio-padrão ~22; 900 a 1.100 é ±4,5 desvios). Pela ordem de id, 2.000 a 0.
+    grade = GradeQuadrada(5)
+    vezes = {0: 0, 1: 0}
+    for seed in range(2000):
+        sim = Simulador(grade, num_veiculos=2, demanda=DemandaPoisson(0),
+                        algoritmo=SemMovimento(), seed=seed)
+        for v in sim.veiculos:
+            v.zona = ZONA
+        pedido_no_proximo_passo(sim)
+        sim.passo()
+        (corrida,) = sim.corridas_ativas
+        vezes[corrida.veiculo.id] += 1
+    assert all(900 <= n <= 1100 for n in vezes.values()), vezes
+
+
+def pares_pedido_veiculo(sim):
+    return [(c.pedido.id, c.veiculo.id) for c in sim.corridas_concluidas + sim.corridas_ativas]
+
+
+def rodada_poisson(seed, trocar_rng_matching=False):
+    sim = Simulador(GradeQuadrada(5), num_veiculos=10, demanda=DemandaPoisson(0.4),
+                    algoritmo=Hotspot(), seed=seed)
+    if trocar_rng_matching:
+        sim.rng_matching = np.random.default_rng(999)
+    sim.rodar(200)
+    return sim
+
+
+def test_mesma_semente_mesmos_pares_pedido_veiculo():
+    assert pares_pedido_veiculo(rodada_poisson(3)) == pares_pedido_veiculo(rodada_poisson(3))
+
+
+def test_gerador_do_matching_nao_muda_os_pedidos():
+    normal, trocado = rodada_poisson(3), rodada_poisson(3, trocar_rng_matching=True)
+
+    def historico(sim):
+        return [(p.origem, p.destino, p.criado_em) for p in sim.historico_pedidos]
+
+    assert historico(normal) == historico(trocado)
+    # e a troca teve efeito: outros motoristas atenderam
+    assert pares_pedido_veiculo(normal) != pares_pedido_veiculo(trocado)
