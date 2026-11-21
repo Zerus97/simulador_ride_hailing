@@ -32,10 +32,10 @@ Exemplo de arquivo:
     sementes = [0, 1, 2]
     saida = "resultados/base_util"
 """
-import datetime
 import tomllib
 from dataclasses import dataclass
 from functools import cache
+from pathlib import Path
 
 from algorithms.gulosa import GulosaDemanda
 from algorithms.hotspot import Hotspot
@@ -48,10 +48,14 @@ from environment.preferencias import DIAS_POR_TIPO, preferencias_do_csv
 from environment.previsao import previsao_do_csv
 from environment.tempo import PASSOS_POR_DIA
 from environment.tempos import tempos_do_csv
-from etl.etl import (DATASET, DIAS_AVALIACAO, DIAS_EXCLUIDOS, DIAS_TREINO, DIAS_VALIDACAO,
-                     SABADOS_TREINO)
+from environment.calendario import (DIAS_AVALIACAO, DIAS_AVALIACAO_EXTRAS, DIAS_TREINO, DIAS_VALIDACAO,
+                                    SABADOS_TREINO, DiaForaDoDesenho)
+from environment.calendario import tipo_do_dia as _tipo_do_dia
 from simulator.demanda import DemandaRegistros
 from simulator.simulator import Simulador
+
+# a pasta dataset/ a partir da raiz do projeto (sem importar o etl/, que puxa a geografia)
+DATASET = Path(__file__).resolve().parent.parent / "dataset"
 
 ALGORITMOS = {
     "sem_movimento": SemMovimento,
@@ -101,17 +105,11 @@ class Cenario:
 
 
 def tipo_do_dia(dia):
-    """ "util" (segunda a quinta) ou "sabado". Sexta e domingo ficaram fora do desenho
-    (Q3) e não têm previsão; o 17/mar também é excluído."""
-    if dia in DIAS_EXCLUIDOS:
-        raise ErroCenario(f"o dia {dia}/mar foi excluído do desenho")
-    dia_semana = datetime.date(2016, 3, dia).weekday()
-    if dia_semana <= 3:
-        return "util"
-    if dia_semana == 5:
-        return "sabado"
-    nome = "sexta" if dia_semana == 4 else "domingo"
-    raise ErroCenario(f"o dia {dia}/mar é {nome}: fora do desenho (Q3), sem previsão")
+    """O tipo_do_dia do calendário (environment/calendario.py), com o erro como ErroCenario."""
+    try:
+        return _tipo_do_dia(dia)
+    except DiaForaDoDesenho as erro:
+        raise ErroCenario(str(erro)) from None
 
 
 # --- leitura e validação ---
@@ -193,11 +191,12 @@ def validar(dados):
 
 
 def _guarda_de_vazamento(cenario):
-    """Ninguém avalia num dia que o modelo já viu, e o ajuste não usa os dias de avaliação."""
+    """Ninguém avalia num dia que o modelo já viu, e o ajuste não usa os dias de
+    avaliação, nem os principais nem os extras."""
     vistos = set(DIAS_TREINO) | set(SABADOS_TREINO) | set(DIAS_VALIDACAO)
     if cenario.finalidade == "avaliacao" and cenario.dia in vistos:
         raise ErroCenario(f"avaliação no dia {cenario.dia}/mar, que é de treino ou de validação")
-    if cenario.finalidade == "ajuste" and cenario.dia in DIAS_AVALIACAO:
+    if cenario.finalidade == "ajuste" and cenario.dia in set(DIAS_AVALIACAO) | set(DIAS_AVALIACAO_EXTRAS):
         raise ErroCenario(f"ajuste no dia {cenario.dia}/mar, que é de avaliação")
 
 

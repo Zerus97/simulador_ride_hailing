@@ -8,7 +8,6 @@ import pytest
 from algorithms.sem_movimento import SemMovimento
 from environment.env import GradeCelulas, grade_do_csv, nao_vizinhos_do_csv
 from environment.preferencias import DIAS_POR_TIPO, preferencias_do_csv
-from etl.etl import DIAS_TREINO, SABADOS_TREINO
 from simulator.demanda import DemandaPoisson
 from simulator.simulator import Simulador
 
@@ -100,10 +99,6 @@ def test_variacao_sem_demanda(tmp_path):
     p = pref.de(base=0, zona_atual=1, hora=9)
     pesos = {1: math.exp(-pref.alfa), 0: 1.0, 2: math.exp(-2 * pref.alfa)}
     assert p == pytest.approx({z: w / sum(pesos.values()) for z, w in pesos.items()})
-
-
-def test_dias_por_tipo_bate_com_o_etl():
-    assert DIAS_POR_TIPO == {"util": len(DIAS_TREINO), "sabado": len(SABADOS_TREINO)}
 
 
 def test_observacao_tem_as_preferencias_dos_ociosos(tmp_path):

@@ -192,11 +192,9 @@ def imprimir_relatorio(relatorio):
     }))
 
 
-DIAS_TREINO = [1, 2, 3, 7, 8, 9, 10]
-SABADOS_TREINO = [5, 12]        # o cenário de fim de semana é o sábado 19/mar
-DIAS_VALIDACAO = [14, 15, 16]   # seg–qua: nem treino, nem avaliação, nem excluídos
-DIAS_AVALIACAO = [23, 19]       # qua 23/mar (dia útil) e sáb 19/mar (fim de semana)
-DIAS_EXCLUIDOS = [17]           # qui 17/mar; sextas e domingos (inclusive a Páscoa, 27) ficam fora pelo tipo de dia
+# As listas de dias vêm do calendário (environment/calendario.py), com os mesmos nomes.
+from environment.calendario import (DIAS_AVALIACAO, DIAS_AVALIACAO_EXTRAS,  # noqa: E402,F401
+                                    DIAS_EXCLUIDOS, DIAS_TREINO, DIAS_VALIDACAO, SABADOS_TREINO)
 KM_POR_MILHA = 1.609
 
 

@@ -24,13 +24,13 @@ Fica no environment/, a camada leve: só a biblioteca padrão.
 import math
 from statistics import fmean, pstdev
 
+from environment.calendario import DIAS_TREINO, SABADOS_TREINO
 from environment.previsao import previsao_do_csv
 
 HORAS_POR_DIA = 24
 PASSOS_POR_HORA = 6
-# Dias de treino por tipo de dia. O environment/ não importa o etl/; um teste confere
-# estes valores contra DIAS_TREINO e SABADOS_TREINO (etl/etl.py).
-DIAS_POR_TIPO = {"util": 7, "sabado": 2}
+# Dias de treino por tipo de dia, das próprias listas do calendário.
+DIAS_POR_TIPO = {"util": len(DIAS_TREINO), "sabado": len(SABADOS_TREINO)}
 CORRECAO_PEDIDOS = 0.5  # meio pedido no total dos dias de treino
 
 

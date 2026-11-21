@@ -21,8 +21,7 @@ import numpy as np
 import pandas as pd
 
 from environment.env import EM_CORRIDA, OCIOSO, REPOSICIONANDO
-from etl.etl import DATASET
-from experimentos.cenario import ler_cenario, montar
+from experimentos.cenario import DATASET, ler_cenario, montar
 from simulator.metricas import TIPOS_MOVIMENTO
 
 RAIZ = Path(__file__).resolve().parent.parent

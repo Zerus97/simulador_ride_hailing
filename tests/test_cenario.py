@@ -70,17 +70,21 @@ def test_tipo_do_dia(dia, tipo):
     assert tipo_do_dia(dia) == tipo
 
 
-@pytest.mark.parametrize("dia", [18, 20, 17])  # sexta, domingo, excluído
+@pytest.mark.parametrize("dia", [18, 20, 17, 26, 27])  # sexta, domingo, excluídos, Páscoa
 def test_tipo_do_dia_fora_do_desenho(dia):
     with pytest.raises(ErroCenario):
         tipo_do_dia(dia)
 
 
 @pytest.mark.parametrize("finalidade, dia", [("avaliacao", 8), ("avaliacao", 12), ("avaliacao", 15),
-                                             ("ajuste", 23), ("ajuste", 19)])
+                                             ("ajuste", 23), ("ajuste", 19), ("ajuste", 22), ("ajuste", 31)])
 def test_guarda_de_vazamento(tmp_path, finalidade, dia):
     with pytest.raises(ErroCenario):
         ler_cenario(escrever(tmp_path, {("cenario", "finalidade"): finalidade, ("cenario", "dia"): dia}))
+
+
+def test_avaliacao_em_dia_extra_e_permitida(tmp_path):
+    assert ler_cenario(escrever(tmp_path, {("cenario", "dia"): 22})).dia == 22
 
 
 def test_ajuste_em_dia_de_treino_e_permitido(tmp_path):
