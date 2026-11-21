@@ -10,6 +10,8 @@ Fica no environment/: o comportamento é do ambiente, não do algoritmo. Três p
 """
 from dataclasses import dataclass
 
+import numpy as np
+
 SEM_RECOMENDACAO = ("ficar", "preferencias")
 
 
@@ -63,6 +65,41 @@ class AceiteFixo(ModeloAceite):
         return self.rho
 
 
+# Distribuição de obediência dos motoristas: questionaire.csv do repositório do
+# i-Rebalance (licença MIT), coluna obey, contada por motorista (87 motoristas, um valor
+# cada; 1.854 respostas no arquivo). Média: 0,490.
+OBEDIENCIA_NIVEIS = (0.0, 0.1, 0.2, 0.25, 0.3, 0.4, 0.45, 0.5, 0.51, 0.6, 0.7, 0.8, 0.9, 1.0)
+OBEDIENCIA_CONTAGENS = (6, 5, 11, 5, 6, 1, 1, 14, 1, 11, 6, 9, 5, 6)
+
+
+class ConfiancaQuestionario(ModeloAceite):
+    """Cada motorista aceita com a sua própria obediência, sorteada uma vez da
+    distribuição do questionário e fixa durante toda a simulação.
+
+    A obediência fica aqui no modelo, e não no Veiculo: é o A do ambiente, e assim não
+    vaza para os algoritmos pela observação (o AAVR terá o seu μ̂ separado)."""
+
+    def __init__(self, niveis=OBEDIENCIA_NIVEIS, contagens=OBEDIENCIA_CONTAGENS):
+        if len(niveis) != len(contagens) or any(c < 0 for c in contagens) or sum(contagens) <= 0:
+            raise ValueError("a tabela de obediência precisa de níveis e contagens válidos")
+        if any(not 0 <= n <= 1 for n in niveis):
+            raise ValueError("os níveis de obediência precisam estar entre 0 e 1")
+        self.niveis = list(niveis)
+        self.contagens = list(contagens)
+        self.obediencia = None
+
+    def iniciar(self, veiculos, rng):
+        """Sorteia uma obediência por veículo, em ordem de id, num único choice."""
+        p = np.asarray(self.contagens, dtype=float) / sum(self.contagens)
+        sorteio = rng.choice(self.niveis, size=len(veiculos), p=p)
+        self.obediencia = {v.id: float(o) for v, o in zip(veiculos, sorteio)}
+
+    def prob(self, veiculo, zona_recomendada, ctx):
+        if self.obediencia is None:
+            raise RuntimeError("ConfiancaQuestionario sem iniciar(): o simulador sorteia as obediências")
+        return self.obediencia[veiculo.id]
+
+
 # --- regras pós-recusa ---
 
 class RegraPosRecusa:
@@ -102,6 +139,12 @@ class Comportamento:
         self.modelo = modelo
         self.regra = regra
         self.sem_recomendacao = sem_recomendacao
+
+    def iniciar(self, veiculos, rng):
+        """Chamado pelo Simulador na construção, com o rng_motoristas: repassa ao modelo
+        de aceite, se ele tiver características por motorista a sortear."""
+        if hasattr(self.modelo, "iniciar"):
+            self.modelo.iniciar(veiculos, rng)
 
     @property
     def precisa_preferencias(self):

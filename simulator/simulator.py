@@ -23,13 +23,14 @@ class Simulador:
             raise NotImplementedError("modo sequencial: tarefa 4.6")
         # Um gerador por fonte de acaso. Os filhos 0, 1 e 2 de spawn(4) são os mesmos
         # de spawn(3): acrescentar o do matching não muda posições, demanda nem aceite.
-        # Os primeiros filhos de spawn(5) são os mesmos de spawn(3) e spawn(4).
-        sementes = np.random.SeedSequence(seed).spawn(5)
+        # Os primeiros filhos de spawn(6) são os mesmos de spawn(3), spawn(4) e spawn(5).
+        sementes = np.random.SeedSequence(seed).spawn(6)
         self.rng_inicial = np.random.default_rng(sementes[0])
         self.rng_demanda = np.random.default_rng(sementes[1])
         self.rng_aceite  = np.random.default_rng(sementes[2])
         self.rng_matching = np.random.default_rng(sementes[3])
         self.rng_algoritmo = np.random.default_rng(sementes[4])
+        self.rng_motoristas = np.random.default_rng(sementes[5])  # características de cada motorista
         self.grade = grade
         self.previsao = previsao
         self.tempos = tempos
@@ -55,6 +56,8 @@ class Simulador:
         self.total_pedidos = 0
         self.pedidos_expirados = 0
         self.veiculos = [Veiculo(v, base) for v, base in enumerate(self.sortear_bases(num_veiculos))]
+        if hasattr(self.comportamento, "iniciar"):
+            self.comportamento.iniciar(self.veiculos, self.rng_motoristas)
         if hasattr(algoritmo, "iniciar"):
             algoritmo.iniciar(self.rng_algoritmo)
 

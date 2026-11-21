@@ -1,11 +1,15 @@
 """1.9(a): o módulo de comportamento (environment/comportamento.py)."""
+from pathlib import Path
+
 import numpy as np
 import pytest
 
 from algorithms.algoritmo_reposicionamento import AlgoritmoReposicionamento
 from algorithms.hotspot import Hotspot
 from algorithms.sem_movimento import SemMovimento
-from environment.comportamento import (AceiteFixo, Comportamento, Contexto, Ficar, Proporcional,
+from environment.comportamento import (OBEDIENCIA_CONTAGENS, OBEDIENCIA_NIVEIS, AceiteFixo,
+                                       Comportamento, ConfiancaQuestionario, Contexto, Ficar,
+                                       Proporcional,
                                        candidatas)
 from environment.env import REPOSICIONANDO, GradeQuadrada, Veiculo
 from environment.preferencias import Preferencias
@@ -168,3 +172,94 @@ def test_parametros_invalidos():
         AceiteFixo(1.5)
     with pytest.raises(ValueError):
         Comportamento(AceiteFixo(1.0), Ficar(), sem_recomendacao="sair_rodando")
+
+
+# --- 1.9(b): confiança fixa do questionário (estrutura; a tabela real vem do questionaire.csv) ---
+
+def com_confianca(niveis, contagens, n=10, seed=0, algoritmo=None, passos=0):
+    sim = Simulador(GradeQuadrada(5), num_veiculos=n, demanda=DemandaPoisson(0.4),
+                    algoritmo=algoritmo or FicarTodos(), seed=seed,
+                    comportamento=Comportamento(ConfiancaQuestionario(niveis, contagens), Ficar()))
+    sim.rodar(passos)
+    return sim
+
+
+def test_confianca_frequencias_da_tabela():
+    niveis, contagens = [0.2, 0.5, 0.9], [10, 30, 60]
+    sim = com_confianca(niveis, contagens, n=10_000)
+    obed = list(sim.comportamento.modelo.obediencia.values())
+    for nivel, c in zip(niveis, contagens):
+        p = c / 100
+        assert abs(obed.count(nivel) / 10_000 - p) < 4 * np.sqrt(p * (1 - p) / 10_000)
+
+
+def test_confianca_fixa_por_motorista_e_reprodutivel():
+    a = com_confianca([0.1, 0.6, 0.95], [1, 1, 1], seed=4, passos=50)
+    b = com_confianca([0.1, 0.6, 0.95], [1, 1, 1], seed=4)
+    assert a.comportamento.modelo.obediencia == b.comportamento.modelo.obediencia
+    ctx = Contexto(hora=9, preferencias=None, grade=a.grade)
+    for v in a.veiculos:
+        assert a.comportamento.modelo.prob(v, v.zona, ctx) == a.comportamento.modelo.obediencia[v.id]
+
+
+def test_confianca_extremos_0_nunca_aceita_e_1_sempre():
+    sim = com_confianca([0.0, 1.0], [1, 1], n=40, seed=1)
+    obed = sim.comportamento.modelo.obediencia
+    aceitos, recusados = set(), set()
+    for _ in range(100):
+        sim.passo()
+        aceitos.update(sim.ultimo_relatorio.aceites)
+        recusados.update(sim.ultimo_relatorio.recusas)
+    assert aceitos and recusados
+    assert all(obed[v] == 1.0 for v in aceitos) and all(obed[v] == 0.0 for v in recusados)
+
+
+def test_confianca_nao_muda_os_numeros_de_aceite():
+    def rodada(comport):
+        sim = Simulador(GradeQuadrada(5), num_veiculos=50, demanda=DemandaPoisson(0.4),
+                        algoritmo=FicarTodos(), seed=7, comportamento=comport)
+        sim.passo()
+        return sim
+
+    fixo = rodada(comportamento(0.5))
+    questionario = rodada(Comportamento(ConfiancaQuestionario([0.3, 0.8], [1, 1]), Ficar()))
+    assert fixo.rng_aceite.bit_generator.state == questionario.rng_aceite.bit_generator.state
+    assert ([(p.origem, p.destino) for p in fixo.historico_pedidos]
+            == [(p.origem, p.destino) for p in questionario.historico_pedidos])
+
+
+def test_confianca_sem_iniciar_da_erro():
+    modelo = ConfiancaQuestionario([0.5], [1])
+    with pytest.raises(RuntimeError):
+        modelo.prob(Veiculo(0, 0), 0, None)
+
+
+# --- a tabela do questionário ---
+
+def test_tabela_do_questionario():
+    assert len(OBEDIENCIA_NIVEIS) == len(OBEDIENCIA_CONTAGENS) == 14
+    assert sum(OBEDIENCIA_CONTAGENS) == 87
+    media = sum(n * c for n, c in zip(OBEDIENCIA_NIVEIS, OBEDIENCIA_CONTAGENS)) / 87
+    assert media == pytest.approx(0.490, abs=5e-4)
+
+
+def test_frequencias_do_questionario_com_8700_motoristas():
+    sim = com_confianca(OBEDIENCIA_NIVEIS, OBEDIENCIA_CONTAGENS, n=8700)
+    obed = list(sim.comportamento.modelo.obediencia.values())
+    for nivel, c in zip(OBEDIENCIA_NIVEIS, OBEDIENCIA_CONTAGENS):
+        p = c / 87
+        assert abs(obed.count(nivel) / 8700 - p) < 4 * np.sqrt(p * (1 - p) / 8700), nivel
+    assert ConfiancaQuestionario().niveis == list(OBEDIENCIA_NIVEIS)  # a tabela é o padrão
+
+
+def test_tabela_bate_com_o_questionaire_csv():
+    arquivo = Path(__file__).resolve().parent.parent / "dataset" / "questionaire.csv"
+    if not arquivo.exists():
+        pytest.skip("questionaire.csv fora do repositório")
+    import pandas as pd
+    q = pd.read_csv(arquivo)
+    q.columns = [c.strip() for c in q.columns]
+    assert (q.groupby("DriverID")["obey"].nunique() == 1).all()  # um valor por motorista
+    contagem = q.groupby("DriverID")["obey"].first().value_counts().sort_index()
+    assert tuple(contagem.index) == pytest.approx(OBEDIENCIA_NIVEIS)
+    assert tuple(contagem.values) == OBEDIENCIA_CONTAGENS
