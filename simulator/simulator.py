@@ -7,11 +7,13 @@ from environment.tempo import PASSOS_POR_DIA
 class Simulador:
     """Junta a grade e os veiculos, e faz o tempo avancar em passos."""
 
-    def __init__(self, grade, num_veiculos, demanda, algoritmo, seed=None, previsao=None, tempos=None):
+    def __init__(self, grade, num_veiculos, demanda, algoritmo, seed=None, previsao=None, tempos=None,
+                 preferencias=None):
         """demanda: a fonte de demanda (ex.: DemandaPoisson), que diz quais pedidos
         chegam a cada passo e define o calendário (passo_do_dia); ver simulator/demanda.py.
         previsao e tempos: só repassados aos algoritmos, na observação
-        (environment/previsao.py e environment/tempos.py)."""
+        (environment/previsao.py e environment/tempos.py).
+        preferencias: environment/preferencias.py; a observação leva a de cada ocioso."""
         # O modo sequencial (um motorista por vez, i-Rebalance original) só existe na
         # tarefa 4.6: melhor falhar na construção do que no meio da simulação.
         if getattr(algoritmo, "sequencial", False):
@@ -28,6 +30,7 @@ class Simulador:
         self.grade = grade
         self.previsao = previsao
         self.tempos = tempos
+        self.preferencias = preferencias
         self.tempo = 0
         self.fonte_demanda = demanda
         self.pedidos = {zona: deque() for zona in self.grade.zonas()}
@@ -235,6 +238,12 @@ class Simulador:
         chegadas = Counter()
         for corrida in self.corridas_ativas:
             chegadas[(corrida.pedido.destino, corrida.horario_chegada)] += 1
+        passo_do_dia = self.fonte_demanda.passo_do_dia(self.tempo)
+        preferencias = None
+        if self.preferencias is not None:
+            hora = passo_do_dia // 6  # o resto por 24 fica com Preferencias.de
+            preferencias = {v.id: self.preferencias.de(v.base, v.zona, hora)
+                            for v in self.veiculos if v.estado == OCIOSO}
         return Observacao(
             tempo=self.tempo,
             ociosos=tuple(self.listar_veiculos(ociosos=True)),
@@ -242,9 +251,10 @@ class Simulador:
             chegadas=chegadas,
             grade=self.grade,
             relatorio=self.ultimo_relatorio,
-            passo_do_dia=self.fonte_demanda.passo_do_dia(self.tempo),
+            passo_do_dia=passo_do_dia,
             previsao=self.previsao,
             tempos=self.tempos,
+            preferencias=preferencias,
         )
 
     def listar_veiculos(self, ociosos=True):

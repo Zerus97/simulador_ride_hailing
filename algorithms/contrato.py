@@ -49,3 +49,4 @@ class Observacao:
     passo_do_dia: int | None = None            # 0 a 143 (pode passar de 143 na última decisão)
     previsao: PrevisaoDemanda | PrevisaoConstante | None = None  # previsao.lam(zona, passo_do_dia)
     tempos: TemposEntreZonas | None = None     # tempos.minutos(a, b, passo_do_dia // 6), tempos.km(a, b)
+    preferencias: dict | None = None           # id do ocioso -> {zona: probabilidade} (zona atual e vizinhas)
