@@ -1,0 +1,28 @@
+# Cenário base de sábado: sem reposicionamento, aceite fixo de 100%.
+# Frota própria, calibrada nos sábados de treino 5 e 12 (1.15): a mais perto de 75%
+# (75,9% no treino; com a frota do dia útil, 1.500, os sábados davam 81,1%, fora da
+# faixa de 70–80%). No dia 19, 10 sementes: 75,7%. Ver resultados/calibracao_frota/.
+[cenario]
+nome = "base_sabado"
+finalidade = "avaliacao"
+lado = 1200
+dia = 19
+fracao = 0.15
+fator_demanda = 1.0
+frota = 1200
+passo_inicial = 18            # 3h
+passos = 126                  # até 24h
+aquecimento = 6
+
+[comportamento]
+modelo = "fixo"
+rho = 1.0
+regra = "ficar"
+sem_recomendacao = "ficar"
+
+[algoritmo]
+nome = "sem_movimento"
+
+[execucao]
+sementes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+saida = "resultados/base_sabado"

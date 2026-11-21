@@ -54,5 +54,58 @@
     "numpy": "2.5.1",
     "data": "2026-11-21T16:59:22"
   },
-  "duracao_s": 122
+  "duracao_s": 122,
+  "sabado": {
+    "decisao": "frota própria (opção b), calibrada nos sábados de treino com a mesma regra; com 1.500, os sábados de treino davam 81,1%, fora da faixa de 70–80%",
+    "regra": "frota da grade 1000–2500 (passo 100) mais perto de 0.75 no atendimento médio dos sábados de treino [5, 12]",
+    "frota": 1200,
+    "treino": {
+      "atendimento_medio": 0.7588439180374557,
+      "desvio_entre_dias": 0.0058155655555451324
+    },
+    "avaliacao": {
+      "19": {
+        "media": 0.7567824581368712,
+        "desvio": 0.006938297994229212,
+        "sementes": 10
+      }
+    },
+    "execucao": {
+      "cenario": {
+        "nome": "frota_1200_dia_19",
+        "finalidade": "avaliacao",
+        "lado": 1200,
+        "dia": 19,
+        "fracao": 0.15,
+        "fator_demanda": 1.0,
+        "frota": 1200,
+        "passo_inicial": 18,
+        "passos": 126,
+        "aquecimento": 6,
+        "modelo_aceite": "fixo",
+        "rho": 1.0,
+        "regra": "ficar",
+        "sem_recomendacao": "ficar",
+        "algoritmo": "sem_movimento",
+        "sementes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ],
+        "saida": "resultados/calibracao_frota"
+      },
+      "commit": "f6bd7fe04032d1e4150f507427c6bf6dd04c8e5f",
+      "alteracoes_nao_commitadas": true,
+      "python": "3.12.2",
+      "numpy": "2.5.1",
+      "data": "2026-11-21T17:04:20"
+    }
+  }
 }

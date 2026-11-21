@@ -1,4 +1,6 @@
 # Cenário base de dia útil: sem reposicionamento, aceite fixo de 100%.
+# Frota calibrada nos dias úteis de treino (1.15): a mais perto de 75% de atendimento
+# (75,6% no treino). No dia 23, 10 sementes: 76,4%. Ver resultados/calibracao_frota/.
 [cenario]
 nome = "base_util"
 finalidade = "avaliacao"
@@ -6,7 +8,7 @@ lado = 1200
 dia = 23
 fracao = 0.15
 fator_demanda = 1.0
-frota = 2500
+frota = 1500
 passo_inicial = 18            # 3h
 passos = 126                  # até 24h
 aquecimento = 6
