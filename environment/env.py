@@ -97,10 +97,14 @@ class Veiculo:
     """Um veículo numa zona, em um dos três estados: OCIOSO, EM_CORRIDA ou REPOSICIONANDO.
 
     destino e chegada só valem durante o reposicionamento: a zona para onde vai e o
-    passo em que chega. Até lá, zona continua sendo a de origem."""
+    passo em que chega. Até lá, zona continua sendo a de origem.
+
+    base: a zona-base do motorista, fixa durante toda a simulação; é também a zona
+    inicial."""
 
     def __init__(self, id_veiculo, zona):
         self.id = id_veiculo
+        self.base = zona
         self.zona = zona
         self.estado = OCIOSO
         self.destino = None

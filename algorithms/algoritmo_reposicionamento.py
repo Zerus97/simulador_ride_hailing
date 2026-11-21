@@ -11,6 +11,12 @@ class AlgoritmoReposicionamento:  # Classe de algoritmos de reposicionamento
     Por enquanto o simulador só tem o modo em lote (decidir) e recusa algoritmos
     sequenciais na construção."""
 
+    def iniciar(self, rng):
+        """Chamado pelo Simulador na construção: o gerador próprio do algoritmo (o 5º
+        filho do spawn), para sorteios como o vizinho aleatório (1.11) e a exploração dos
+        métodos de RL. Sortear com ele não muda os pedidos nem as posições iniciais."""
+        self.rng = rng
+
     def decidir(self, obs: Observacao):
         """Recebe a Observacao do passo e devolve {id do veículo: zona}.
 

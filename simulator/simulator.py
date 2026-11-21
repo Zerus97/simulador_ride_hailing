@@ -2,6 +2,7 @@ from collections import Counter, deque
 import numpy as np
 from algorithms.contrato import Observacao, RelatorioDoPasso
 from environment.env import EM_CORRIDA, OCIOSO, REPOSICIONANDO, Corrida, Pedido, Veiculo
+from environment.tempo import PASSOS_POR_DIA
 
 class Simulador:
     """Junta a grade e os veiculos, e faz o tempo avancar em passos."""
@@ -17,11 +18,13 @@ class Simulador:
             raise NotImplementedError("modo sequencial: tarefa 4.6")
         # Um gerador por fonte de acaso. Os filhos 0, 1 e 2 de spawn(4) são os mesmos
         # de spawn(3): acrescentar o do matching não muda posições, demanda nem aceite.
-        sementes = np.random.SeedSequence(seed).spawn(4)
+        # Os primeiros filhos de spawn(5) são os mesmos de spawn(3) e spawn(4).
+        sementes = np.random.SeedSequence(seed).spawn(5)
         self.rng_inicial = np.random.default_rng(sementes[0])
         self.rng_demanda = np.random.default_rng(sementes[1])
         self.rng_aceite  = np.random.default_rng(sementes[2])
         self.rng_matching = np.random.default_rng(sementes[3])
+        self.rng_algoritmo = np.random.default_rng(sementes[4])
         self.grade = grade
         self.previsao = previsao
         self.tempos = tempos
@@ -36,14 +39,27 @@ class Simulador:
         # relatório do passo: o que aconteceu, registrado durante o passo
         self.ultimo_relatorio = None   # o do último passo completo (o do passo final nunca chega ao algoritmo)
         self._casamentos, self._chegadas, self._aceites = [], [], []
-        # espalha os veiculos em zonas aleatorias da grade
-        zonas = grade.zonas()
         self.ociosidades = 0
         self.total_pedidos = 0
         self.pedidos_expirados = 0
-        self.veiculos = [
-            Veiculo(v, self.escolher(zonas, self.rng_inicial)) for v in range(num_veiculos)
-        ]
+        self.veiculos = [Veiculo(v, base) for v, base in enumerate(self.sortear_bases(num_veiculos))]
+        if hasattr(algoritmo, "iniciar"):
+            algoritmo.iniciar(self.rng_algoritmo)
+
+    def sortear_bases(self, num_veiculos):
+        """Zona-base de cada motorista (fixa; é também a zona inicial), com o rng_inicial.
+
+        Com previsão: proporcional à demanda total de cada zona no dia (soma de
+        previsao.lam nos 144 passos, do treino), num único sorteio. Sem previsão (a
+        grade 5 × 5 dos testes): uniforme, um sorteio por veículo, como antes."""
+        zonas = self.grade.zonas()
+        if self.previsao is None:
+            return [self.escolher(zonas, self.rng_inicial) for _ in range(num_veiculos)]
+        pesos = np.array([sum(self.previsao.lam(z, p) for p in range(PASSOS_POR_DIA)) for z in zonas])
+        if pesos.sum() <= 0:
+            raise ValueError("a previsão não tem demanda em nenhuma zona: não dá para sortear as bases")
+        indices = self.rng_inicial.choice(len(zonas), size=num_veiculos, p=pesos / pesos.sum())
+        return [zonas[i] for i in indices]
 
     def escolher(self, opcoes, rng):
         """Escolhe um elemento aleatorio da lista usando o gerador informado."""
