@@ -14,12 +14,18 @@ MINUTOS_POR_PASSO = SEGUNDOS_POR_PASSO // 60      # 10
 PASSOS_POR_DIA = 24 * 3600 // SEGUNDOS_POR_PASSO  # 144
 
 
+LIMIAR_ARREDONDAMENTO = 0.0   # c em floor(min/10 + c); calibrado nos dias úteis de treino (21/nov)
+
+
 def passos_da_corrida(duracao_min):
-    """Passos que o carro fica ocupado: o mais próximo, com mínimo de 1.
-    floor(x + 0,5), e não round(): o round() do Python leva 25 min para 2 passos."""
+    """Passos que o carro fica ocupado: para baixo, com mínimo de 1.
+    O mínimo infla as corridas curtas; arredondar para baixo compensa no total.
+
+    O limiar é lido aqui dentro, a cada chamada, para que um teste possa trocá-lo
+    (monkeypatch) e comparar as duas versões."""
     if duracao_min is None:          # pedidos da Poisson: 1 passo, como hoje
         return 1
-    return max(1, math.floor(duracao_min / MINUTOS_POR_PASSO + 0.5))
+    return max(1, math.floor(duracao_min / MINUTOS_POR_PASSO + LIMIAR_ARREDONDAMENTO))
 
 
 def espera_min(segundo_do_dia, passos_ate_atender):

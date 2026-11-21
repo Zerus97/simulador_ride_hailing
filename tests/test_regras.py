@@ -130,10 +130,10 @@ def test_veiculo_movido_em_t_so_atende_na_zona_nova_em_t1():
 # --- 1.5: estados do veículo e corridas com a duração real ---
 
 def test_corrida_longa_ocupa_o_carro_pela_duracao():
-    # 25 min -> floor(2,5 + 0,5) = 3 passos: EM_CORRIDA em t, t+1 e t+2; OCIOSO em t+3
+    # 39 min -> floor(3,9) = 3 passos (para baixo): EM_CORRIDA em t, t+1 e t+2; OCIOSO em t+3
     sim = simulador_vazio()
     sim.veiculos[0].zona = ZONA
-    pedido = pedido_no_proximo_passo(sim, duracao_min=25)
+    pedido = pedido_no_proximo_passo(sim, duracao_min=39)
     t = pedido.criado_em
 
     estados = []
