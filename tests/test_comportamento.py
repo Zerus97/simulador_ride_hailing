@@ -7,6 +7,7 @@ import pytest
 from algorithms.algoritmo_reposicionamento import AlgoritmoReposicionamento
 from algorithms.hotspot import Hotspot
 from algorithms.sem_movimento import SemMovimento
+from algorithms.sem_recomendacao import SemRecomendacao
 from environment.comportamento import (OBEDIENCIA_CONTAGENS, OBEDIENCIA_NIVEIS, AceiteFixo,
                                        Comportamento, ConfiancaQuestionario, Contexto, Ficar,
                                        Proporcional,
@@ -147,7 +148,8 @@ def test_recomendacao_de_ficar_recusada_pode_mover():
 
 @pytest.mark.parametrize("sem", ["ficar", "preferencias"])
 def test_sem_recomendacao_fica_fora_de_aceites_e_recusas(sem):
-    sim = Simulador(GRADE3, num_veiculos=20, demanda=DemandaPoisson(0), algoritmo=SemMovimento(),
+    algoritmo = SemMovimento() if sem == "ficar" else SemRecomendacao()
+    sim = Simulador(GRADE3, num_veiculos=20, demanda=DemandaPoisson(0), algoritmo=algoritmo,
                     seed=0, preferencias=PREF, comportamento=comportamento(0.5, sem=sem))
     sim.passo()
     assert sim.ultimo_relatorio.aceites == () and sim.ultimo_relatorio.recusas == ()

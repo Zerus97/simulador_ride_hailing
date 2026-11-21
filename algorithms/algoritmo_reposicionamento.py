@@ -11,6 +11,11 @@ class AlgoritmoReposicionamento:  # Classe de algoritmos de reposicionamento
     Por enquanto o simulador só tem o modo em lote (decidir) e recusa algoritmos
     sequenciais na construção."""
 
+    exige_sem_recomendacao = None
+    """O que o motorista sem recomendação precisa fazer para o algoritmo ser o que diz
+    ser ("ficar" ou "preferencias"; None = sem exigência). O Simulador confere contra o
+    comportamento.sem_recomendacao na construção e levanta ValueError se não bater."""
+
     def iniciar(self, rng):
         """Chamado pelo Simulador na construção: o gerador próprio do algoritmo (o 5º
         filho do spawn), para sorteios como o vizinho aleatório (1.11) e a exploração dos

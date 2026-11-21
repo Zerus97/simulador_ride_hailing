@@ -13,7 +13,13 @@ import pytest
 
 from algorithms.algoritmo_reposicionamento import AlgoritmoReposicionamento
 from algorithms.hotspot import Hotspot
+from algorithms.gulosa import GulosaDemanda
 from algorithms.sem_movimento import SemMovimento
+from algorithms.sem_recomendacao import SemRecomendacao
+from algorithms.vizinho_aleatorio import VizinhoAleatorio
+from environment.comportamento import AceiteFixo, Comportamento, Ficar
+from environment.preferencias import Preferencias
+from environment.previsao import PrevisaoDemanda
 from environment.env import EM_CORRIDA, OCIOSO, REPOSICIONANDO, GradeQuadrada, Pedido
 from simulator.demanda import DemandaPoisson
 from simulator.simulator import Simulador
@@ -184,6 +190,9 @@ class Espiao(AlgoritmoReposicionamento):
         self.algoritmo = algoritmo
         self.recomendacoes = []
 
+    def iniciar(self, rng):
+        self.algoritmo.iniciar(rng)  # o gerador vai para o algoritmo real
+
     def decidir(self, obs):
         moves = self.algoritmo.decidir(obs)
         zona_atual = dict(obs.ociosos)
@@ -192,12 +201,40 @@ class Espiao(AlgoritmoReposicionamento):
         return moves
 
 
-@pytest.mark.parametrize("algoritmo", ALGORITMOS)
+def preferencias_5x5():
+    """Preferências e previsão de mentira na grade 5 × 5 (demanda sorteada, semente fixa)."""
+    rng = np.random.default_rng(0)
+    grade = GradeQuadrada(5)
+    lam = {(z, h): float(rng.uniform(0.5, 5)) for z in grade.zonas() for h in range(24)}
+    dia = {z: sum(lam[(z, h)] for h in range(24)) for z in grade.zonas()}
+    pref = Preferencias(grade, 1000, lam, {k: v + 0.25 for k, v in lam.items()},
+                        {z: d / sum(dia.values()) for z, d in dia.items()})
+    previsao = PrevisaoDemanda({(z, p): lam[(z, p // 6)] / 6 for z in grade.zonas() for p in range(144)})
+    return pref, previsao
+
+
+PREF_5X5, PREVISAO_5X5 = preferencias_5x5()
+
+# cada baseline com o que ele exige do simulador
+CONFIGURACOES = {
+    "sem_movimento": (SemMovimento, {}),
+    "hotspot": (Hotspot, {}),
+    "sem_recomendacao": (SemRecomendacao, {
+        "preferencias": PREF_5X5,
+        "comportamento": Comportamento(AceiteFixo(1.0), Ficar(), sem_recomendacao="preferencias")}),
+    "vizinho_aleatorio": (VizinhoAleatorio, {}),
+    "gulosa": (GulosaDemanda, {"previsao": PREVISAO_5X5}),
+}
+
+
+@pytest.mark.parametrize("nome", CONFIGURACOES)
 @pytest.mark.parametrize("seed", SEMENTES)
-def test_recomendacao_e_zona_atual_ou_vizinha(algoritmo, seed):
+def test_recomendacao_e_zona_atual_ou_vizinha(nome, seed):
+    algoritmo, extras = CONFIGURACOES[nome]
     espiao = Espiao(algoritmo())
     grade = GradeQuadrada(5)
-    sim = Simulador(grade, num_veiculos=10, demanda=DemandaPoisson(0.4), algoritmo=espiao, seed=seed)
+    sim = Simulador(grade, num_veiculos=10, demanda=DemandaPoisson(0.4), algoritmo=espiao, seed=seed,
+                    **extras)
 
     sim.rodar(200)
 
@@ -469,6 +506,6 @@ def test_algoritmo_sequencial_e_recusado_na_construcao():
                   algoritmo=Sequencial(), seed=0)
 
 
-@pytest.mark.parametrize("algoritmo", ALGORITMOS)
-def test_algoritmos_existentes_decidem_em_lote(algoritmo):
-    assert algoritmo.sequencial is False
+@pytest.mark.parametrize("nome", CONFIGURACOES)
+def test_algoritmos_existentes_decidem_em_lote(nome):
+    assert CONFIGURACOES[nome][0].sequencial is False

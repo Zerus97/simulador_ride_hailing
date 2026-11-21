@@ -41,6 +41,10 @@ class Simulador:
             raise ValueError("o comportamento sorteia pelas preferências (regra Proporcional ou "
                              "sem_recomendacao='preferencias'), mas o simulador não recebeu preferencias")
         self.comportamento = comportamento
+        exige = getattr(algoritmo, "exige_sem_recomendacao", None)
+        if exige is not None and exige != comportamento.sem_recomendacao:
+            raise ValueError(f"{type(algoritmo).__name__} exige sem_recomendacao={exige!r}, "
+                             f"mas o comportamento tem {comportamento.sem_recomendacao!r}")
         self.tempo = 0
         self.fonte_demanda = demanda
         self.pedidos = {zona: deque() for zona in self.grade.zonas()}
