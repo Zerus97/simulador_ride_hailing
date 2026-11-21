@@ -20,7 +20,7 @@ from scipy.sparse.csgraph import dijkstra
 from scipy.spatial import cKDTree
 
 from etl.etl import DATASET, DIAS_TREINO, SAIDA, duracao_min
-from etl.grade import celula, para_metros, pontas_em_metros
+from etl.grade import celula, para_latlon, para_metros, pontas_em_metros
 from etl.zonas import poligono_manhattan
 
 REDE = DATASET / "manhattan_drive.graphml"
@@ -225,14 +225,55 @@ def pares_vizinhos(grade):
 
 
 def pontos_mediana(df, grade, lado, origem):
-    """(x, y) em metros de cada célula: mediana dos embarques e desembarques nela."""
+    """(x, y) em metros de cada célula: mediana dos embarques e desembarques nela.
+
+    Uma célula da grade sem nenhuma viagem em `df` dá KeyError com a lista delas."""
     (xe, ye), (xd, yd) = pontas_em_metros(df)
     x, y = np.r_[xe, xd], np.r_[ye, yd]
     linha, coluna = celula(x, y, lado, origem)
     med = pd.DataFrame({"linha": linha, "coluna": coluna, "x": x, "y": y}) \
         .groupby(["linha", "coluna"])[["x", "y"]].median()
-    med = med.loc[list(zip(grade["linha"], grade["coluna"]))]
+    celulas = list(zip(grade["linha"], grade["coluna"]))
+    sem_viagens = [c for c in celulas if c not in med.index]
+    if sem_viagens:
+        raise KeyError(f"células sem viagens nestes dados: {sem_viagens}")
+    med = med.loc[celulas]
     return med["x"].values, med["y"].values
+
+
+LIMITE_DIST_NO_M = 200  # ponto mais longe que isso de qualquer cruzamento: água ou parque
+
+
+def pontos_zonas(df, grade, lado, origem, g):
+    """1.3b: um ponto por célula (mediana das viagens de TREINO) ligado ao cruzamento
+    mais próximo da rede. Salva dataset/pontos_{lado}.csv e devolve a tabela.
+
+    Só os dias de treino: nada do dia de avaliação entra na construção do modelo.
+    O cruzamento vai pelo id do OSM, que não muda se a ordem da lista de nós mudar."""
+    treino = df[df["tpep_pickup_datetime"].dt.day.isin(DIAS_TREINO)]
+    x, y = pontos_mediana(treino, grade, lado, origem)
+    nos = list(g.nodes)
+    indice, distancia = no_mais_proximo_xy(g, nos, x, y)
+    lon, lat = para_latlon.transform(x, y)
+    pontos = pd.DataFrame({
+        "linha": grade["linha"].values, "coluna": grade["coluna"].values,
+        "x": x, "y": y, "lon": lon, "lat": lat,
+        "no_osm": [nos[i] for i in indice],
+        "dist_no_m": distancia,
+    })
+    pontos.to_csv(DATASET / f"pontos_{lado}.csv", index=False)
+    return pontos
+
+
+def conferir_pontos(pontos, lado):
+    d = pontos["dist_no_m"]
+    print(f"\n== pontos {lado} m: {len(pontos)} células ==")
+    print(f"distância ao cruzamento: mediana {d.median():.0f} m | máximo {d.max():.0f} m")
+    longe = pontos[d > LIMITE_DIST_NO_M]
+    print(f"acima de {LIMITE_DIST_NO_M} m: {len(longe)}")
+    if len(longe):
+        print(longe[["linha", "coluna", "lat", "lon", "no_osm", "dist_no_m"]]
+              .round({"lat": 5, "lon": 5, "dist_no_m": 0}).to_string(index=False))
 
 
 def tempos_vizinhos(g, grade, x, y, fatores):
@@ -280,11 +321,22 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Rede viária de Manhattan (OpenStreetMap).")
     parser.add_argument("--rede", action="store_true",
                         help="1.3a: só baixa (se preciso) e confere a rede, e mostra os metadados")
+    parser.add_argument("--pontos", action="store_true",
+                        help="1.3b: ponto de cada célula ligado ao cruzamento mais próximo")
     args = parser.parse_args()
 
     if args.rede:
         g = rede()
         print(json.dumps(metadados(), indent=2, ensure_ascii=False))
+        raise SystemExit
+
+    if args.pontos:
+        df = pd.read_parquet(SAIDA)
+        g = rede()
+        origem = origem_grade()
+        for lado in LADOS:
+            grade = pd.read_csv(DATASET / f"grade_{lado}.csv")
+            conferir_pontos(pontos_zonas(df, grade, lado, origem, g), lado)
         raise SystemExit
 
     df = pd.read_parquet(SAIDA)

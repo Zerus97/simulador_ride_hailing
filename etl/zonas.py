@@ -13,8 +13,10 @@ ARQUIVO_ZONAS = Path(__file__).resolve().parent.parent / "dataset" / "taxi_zones
 # Zonas excluídas:
 # - Governor's/Ellis/Liberty: sem acesso por carro (sem rota no OpenStreetMap);
 # - Randalls Island: no máximo 0,072% das viagens, e o tempo até as vizinhas
-#   passa de 15 min, o que deixaria a ilha isolada no grafo de vizinhança.
-EXCLUIDAS = ["Governor's Island/Ellis Island/Liberty Island", "Randalls Island"]
+#   passa de 15 min, o que deixaria a ilha isolada no grafo de vizinhança;
+# - Roosevelt Island: 0,051% das viagens; as ruas da ilha só se ligam ao Queens,
+#   então não há rota dentro da rede de Manhattan.
+EXCLUIDAS = ["Governor's Island/Ellis Island/Liberty Island", "Randalls Island", "Roosevelt Island"]
 
 
 def ler_zonas(caminho=ARQUIVO_ZONAS):

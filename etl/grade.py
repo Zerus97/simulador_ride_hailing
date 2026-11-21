@@ -3,18 +3,25 @@ Células da grade a partir das viagens (tarefa 1.2, lado dos dados).
 
 python -m etl.grade    monta as grades de 1200 m e 600 m, salva os CSVs e as figuras
 
-A grade é uma só para todos os cenários: as células ocupadas saem de todos
-os dias de março, não do dia escolhido para a simulação.
+A grade é uma só para todos os cenários: as células saem dos dias de treino
+(DIAS_TREINO), não do dia escolhido para a simulação. Uma célula existe se tem
+pelo menos MINIMO_PONTAS_TREINO embarques + desembarques nos dias de treino.
+As colunas embarques e desembarques do CSV são do mês inteiro, só como informação.
 """
 import numpy as np
 import pandas as pd
 from pyproj import Transformer
 
-from etl.etl import DATASET, SAIDA
+from etl.etl import DATASET, DIAS_TREINO, SAIDA
 from etl.zonas import CRS_GRADE, origem_grade
 
 LADOS = [1200, 600]  # lado da célula, em metros
 POUCAS_VIAGENS = 10  # limite para listar as células quase vazias
+
+# Mínimo de pontas (embarques + desembarques) nos dias de treino para a célula existir.
+# Na grade de 1,2 km, as contagens saltam de 16 para 81; com menos de 20 pontos,
+# a mediana que define o ponto da zona não é confiável.
+MINIMO_PONTAS_TREINO = 20
 
 # always_xy=True: longitude (x) antes de latitude (y), como no contains_xy.
 para_metros = Transformer.from_crs(4326, CRS_GRADE, always_xy=True)
@@ -55,6 +62,25 @@ def montar_grade(embarques, desembarques, lado, origem):
     return grade
 
 
+def pontas_treino(df, lado, origem):
+    """Embarques + desembarques por célula, só nos dias de treino."""
+    treino = df[df["tpep_pickup_datetime"].dt.day.isin(DIAS_TREINO)]
+    embarques, desembarques = pontas_em_metros(treino)
+    # fill_value=0: uma célula com só embarques (ou só desembarques) não vira NaN
+    return contar(*embarques, lado, origem, "embarques") \
+        .add(contar(*desembarques, lado, origem, "desembarques"), fill_value=0) \
+        .rename("pontas_treino")
+
+
+def filtrar_por_treino(grade, pontas):
+    """Acrescenta a coluna pontas_treino (0 nas células sem nenhuma) e separa as
+    células com menos de MINIMO_PONTAS_TREINO. Devolve (mantidas, removidas)."""
+    grade = grade.join(pontas, on=["linha", "coluna"])
+    grade["pontas_treino"] = grade["pontas_treino"].fillna(0).astype(int)
+    fica = grade["pontas_treino"] >= MINIMO_PONTAS_TREINO
+    return grade[fica].reset_index(drop=True), grade[~fica].reset_index(drop=True)
+
+
 def matriz_embarques(grade):
     """Matriz linha x coluna com os embarques; np.nan nas células sem viagens."""
     matriz = np.full((grade["linha"].max() + 1, grade["coluna"].max() + 1), np.nan)
@@ -87,7 +113,17 @@ if __name__ == "__main__":
     for lado in LADOS:
         grade = montar_grade(embarques, desembarques, lado, origem)
         assert (grade[["linha", "coluna"]] >= 0).all().all(), "ponto antes da origem"
+        # antes do filtro: toda viagem do mês cai em alguma célula
         assert grade["embarques"].sum() == len(df) == grade["desembarques"].sum()
+
+        grade, removidas = filtrar_por_treino(grade, pontas_treino(df, lado, origem))
+        print(f"\n== lado {lado} m: {len(removidas)} células removidas "
+              f"(menos de {MINIMO_PONTAS_TREINO} pontas nos dias de treino) ==")
+        if len(removidas):
+            removidas["pontas_mes"] = removidas["embarques"] + removidas["desembarques"]
+            print(removidas[["linha", "coluna", "pontas_treino", "pontas_mes", "embarques",
+                             "desembarques", "lat_centro", "lon_centro"]]
+                  .round({"lat_centro": 4, "lon_centro": 4}).to_string(index=False))
 
         csv = DATASET / f"grade_{lado}.csv"
         png = DATASET / f"grade_{lado}.png"

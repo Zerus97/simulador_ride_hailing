@@ -85,9 +85,9 @@ def test_grade_do_csv(tmp_path):
     assert [g.celula(z) for z in g.zonas()] == sorted(ESCADA)
 
 
-# Os números de zonas mudam se as pendências da Roosevelt Island e das células
-# quase vazias forem resolvidas; aí este teste é atualizado.
-@pytest.mark.parametrize("lado, n_zonas", [(1200, 64), (600, 199)])
+# Sem a Roosevelt Island (pendência 8) e com as células definidas pelos dias de
+# treino, com pelo menos MINIMO_PONTAS_TREINO pontas (pendência 9).
+@pytest.mark.parametrize("lado, n_zonas", [(1200, 58), (600, 178)])
 def test_manhattan_e_conexa(lado, n_zonas):
     caminho = DATASET / f"grade_{lado}.csv"
     if not caminho.exists():
