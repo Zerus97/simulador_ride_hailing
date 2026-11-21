@@ -226,6 +226,7 @@ class Simulador:
         inicio = time.perf_counter()
         repositioning = self.algoritmo.decidir(obs)
         tempo_decisao = time.perf_counter() - inicio
+        self.ultimo_tempo_decisao = tempo_decisao  # s, do decidir deste passo
         self.repositioning(repositioning)
         self.ociosidade()
         self.ultimo_relatorio = RelatorioDoPasso(
