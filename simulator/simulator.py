@@ -1,6 +1,7 @@
 from collections import Counter, deque
 import numpy as np
 from algorithms.contrato import Observacao, RelatorioDoPasso
+from environment.comportamento import AceiteFixo, Comportamento, Contexto, Ficar
 from environment.env import EM_CORRIDA, OCIOSO, REPOSICIONANDO, Corrida, Pedido, Veiculo
 from environment.tempo import PASSOS_POR_DIA
 
@@ -8,12 +9,14 @@ class Simulador:
     """Junta a grade e os veiculos, e faz o tempo avancar em passos."""
 
     def __init__(self, grade, num_veiculos, demanda, algoritmo, seed=None, previsao=None, tempos=None,
-                 preferencias=None):
+                 preferencias=None, comportamento=None):
         """demanda: a fonte de demanda (ex.: DemandaPoisson), que diz quais pedidos
         chegam a cada passo e define o calendário (passo_do_dia); ver simulator/demanda.py.
         previsao e tempos: só repassados aos algoritmos, na observação
         (environment/previsao.py e environment/tempos.py).
-        preferencias: environment/preferencias.py; a observação leva a de cada ocioso."""
+        preferencias: environment/preferencias.py; a observação leva a de cada ocioso.
+        comportamento: como o motorista responde à recomendação (environment/comportamento.py);
+        o padrão, aceite de 100% e ficar sem recomendação, é o simulador de antes da 1.9."""
         # O modo sequencial (um motorista por vez, i-Rebalance original) só existe na
         # tarefa 4.6: melhor falhar na construção do que no meio da simulação.
         if getattr(algoritmo, "sequencial", False):
@@ -31,6 +34,12 @@ class Simulador:
         self.previsao = previsao
         self.tempos = tempos
         self.preferencias = preferencias
+        if comportamento is None:
+            comportamento = Comportamento(AceiteFixo(1.0), Ficar(), sem_recomendacao="ficar")
+        if comportamento.precisa_preferencias and preferencias is None:
+            raise ValueError("o comportamento sorteia pelas preferências (regra Proporcional ou "
+                             "sem_recomendacao='preferencias'), mas o simulador não recebeu preferencias")
+        self.comportamento = comportamento
         self.tempo = 0
         self.fonte_demanda = demanda
         self.pedidos = {zona: deque() for zona in self.grade.zonas()}
@@ -41,7 +50,7 @@ class Simulador:
         self.proximo_id_pedido = 1
         # relatório do passo: o que aconteceu, registrado durante o passo
         self.ultimo_relatorio = None   # o do último passo completo (o do passo final nunca chega ao algoritmo)
-        self._casamentos, self._chegadas, self._aceites = [], [], []
+        self._casamentos, self._chegadas, self._aceites, self._recusas = [], [], [], []
         self.ociosidades = 0
         self.total_pedidos = 0
         self.pedidos_expirados = 0
@@ -131,20 +140,31 @@ class Simulador:
                 self._chegadas.append((v.id, v.zona))
 
     def repositioning(self, moves):
-        """Aplica a saída do algoritmo, {id do veículo: zona}:
-          - zona vizinha: mover; o carro sai REPOSICIONANDO e chega no passo seguinte;
-          - zona atual: ficar (é uma recomendação: na 1.9, o motorista pode recusar);
-          - id ausente: sem recomendação (na 1.9, conduta própria do motorista);
+        """Aplica a saída do algoritmo, {id do veículo: zona}, pela resposta dos motoristas:
+          - zona vizinha: mover; zona atual: ficar (as duas são recomendações, que o
+            motorista aceita ou recusa, pelo comportamento);
+          - id ausente: sem recomendação (conduta própria: comportamento.sem_recomendacao);
           - None: não permitido.
-        Tudo é validado antes de aplicar qualquer movimento (ValueError, e não assert:
-        o Python ignora asserts com -O). Ainda não há recusa (tarefa 1.9): toda
-        recomendação, de mover ou de ficar, é aceita e entra em aceites."""
+        Tudo é validado antes (ValueError, e não assert: o Python ignora asserts com -O).
+
+        Os sorteios são parte do contrato: para cada veículo ocioso, em ordem de id, dois
+        números do rng_aceite, u_aceite e depois u_destino, SEMPRE, usados ou não. Quem
+        termina em outra zona sai REPOSICIONANDO e chega no passo seguinte. Aceites e
+        recusas vão para o relatório; os sem recomendação, para nenhum dos dois."""
         self.validar_recomendacoes(moves)
+        ctx = Contexto(hora=self.fonte_demanda.passo_do_dia(self.tempo) // 6,
+                       preferencias=self.preferencias, grade=self.grade)
         for veiculo in self.veiculos:  # ordem de id
-            if veiculo.id not in moves:
+            if veiculo.estado != OCIOSO:
                 continue
-            destino = moves[veiculo.id]
-            self._aceites.append(veiculo.id)
+            u_aceite = self.rng_aceite.random()
+            u_destino = self.rng_aceite.random()
+            aceitou, destino = self.comportamento.responder(
+                veiculo, moves.get(veiculo.id), ctx, u_aceite, u_destino)
+            if aceitou is True:
+                self._aceites.append(veiculo.id)
+            elif aceitou is False:
+                self._recusas.append(veiculo.id)
             if destino != veiculo.zona:
                 veiculo.estado = REPOSICIONANDO
                 veiculo.destino = destino
@@ -179,7 +199,7 @@ class Simulador:
 
     def passo(self):
         self.tempo += 1
-        self._casamentos, self._chegadas, self._aceites = [], [], []
+        self._casamentos, self._chegadas, self._aceites, self._recusas = [], [], [], []
         self.demanda()
         self.arrivals()
         self.expire()
@@ -192,7 +212,7 @@ class Simulador:
             casamentos=tuple(self._casamentos),
             chegadas=tuple(self._chegadas),
             aceites=tuple(self._aceites),
-            recusas=(),  # ainda não há recusa (tarefa 1.9)
+            recusas=tuple(self._recusas),
         )
 
     def ociosidade(self):
