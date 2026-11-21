@@ -60,8 +60,13 @@ def test_cenario_valido(tmp_path):
     ({("algoritmo", "nome"): "sem_recomendacao"}, None, "sem_recomendacao"),  # exigência do algoritmo
     ({("comportamento", "n0"): 48.0}, None, "n0"),                             # n0 proibido sem "evolutivo"
     ({("comportamento", "modelo"): "evolutivo"}, [("comportamento", "rho")], "n0"),  # n0 exigido
+    ({("comportamento", "modelo"): "ashkrof"}, [("comportamento", "rho")], "regra"),  # regra proibida
+    ({("comportamento", "modelo"): "ashkrof"}, [("comportamento", "regra")], "rho"),  # rho proibido
+    ({("comportamento", "modelo"): "ashkrof", ("comportamento", "n0"): 48.0},
+     [("comportamento", "rho"), ("comportamento", "regra")], "n0"),                    # n0 proibido
 ], ids=["faltando", "desconhecido", "algoritmo", "regra", "lado", "tipo", "aquecimento",
-        "rho_faltando", "rho_sobrando", "exigencia", "n0_sobrando", "n0_faltando"])
+        "rho_faltando", "rho_sobrando", "exigencia", "n0_sobrando", "n0_faltando",
+        "ashkrof_regra", "ashkrof_rho", "ashkrof_n0"])
 def test_erros_de_cenario(tmp_path, mudar, tirar, trecho):
     with pytest.raises(ErroCenario, match=trecho):
         ler_cenario(escrever(tmp_path, mudar, tirar))
@@ -129,3 +134,9 @@ def test_modelo_evolutivo_no_cenario(tmp_path):
     c = ler_cenario(escrever(tmp_path, {("comportamento", "modelo"): "evolutivo", ("comportamento", "n0"): 48.0},
                              tirar=[("comportamento", "rho")]))
     assert (c.modelo_aceite, c.n0, c.rho) == ("evolutivo", 48.0, None)
+
+
+def test_modelo_ashkrof_no_cenario(tmp_path):
+    c = ler_cenario(escrever(tmp_path, {("comportamento", "modelo"): "ashkrof"},
+                             tirar=[("comportamento", "rho"), ("comportamento", "regra")]))
+    assert (c.modelo_aceite, c.regra, c.rho, c.n0) == ("ashkrof", None, None, None)

@@ -8,6 +8,7 @@ Fica no environment/: o comportamento é do ambiente, não do algoritmo. Três p
     não. Assim a quantidade de sorteios não depende do que o modelo decide, e o aceite
     fica encaixado entre valores de ρ (quem aceita com 0,3 também aceita com 0,7).
 """
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -21,6 +22,9 @@ class Contexto:
     hora: int              # passo_do_dia // 6 (o resto por 24 fica com Preferencias.de)
     preferencias: object   # environment.preferencias.Preferencias, ou None
     grade: object          # o grafo de zonas
+    tipo_dia: str = None   # "util"/"sabado" (None: sem calendário, ex.: Poisson; vale como útil)
+    tempo: int = None      # passo atual da simulação (para a espera do motorista)
+    tempos: object = None  # environment.tempos.TemposEntreZonas, ou None
 
 
 def candidatas(zona, grade):
@@ -254,3 +258,79 @@ class Comportamento:
         if u_aceite < self.modelo.prob(veiculo, recomendacao, ctx):
             return True, recomendacao
         return False, self.regra.destino(veiculo, recomendacao, ctx, u_destino)
+
+
+# --- o modelo de Ashkrof (1.10c) ---
+
+class ComportamentoAshkrof(Comportamento):
+    """Logit multinomial de Ashkrof (Tabela 3; arquivo de decisões, seção 8): o motorista
+    escolhe entre W (esperar onde está), H (ir para a zona recomendada) e C (sair rodando
+    para uma vizinha). Decide tudo de uma vez, então não usa modelo de aceite nem regra
+    pós-recusa: reescreve o responder.
+
+      V_W = 0,207 − 0,022 · min(espera, 25) + 0,322 · 1 (local central) + 0,286 · 0
+            (estacionamento) + 0,350 · fim_de_semana
+      V_H = 0,080 · min(corridas, 14) − 0,025 · minutos até a zona recomendada
+      V_C = −0,312 · familiar (zona atual = base ou vizinha da base)
+
+    espera = (passo atual − fim da última corrida) × 10 min; minutos = tempos.minutos(zona,
+    recomendada, hora), 0 na recomendação de ficar (pendência A); "início do turno" não
+    entra. P = exp(V) ÷ soma dos exp(V).
+
+    Com os dois números de sempre: u_aceite escolhe a alternativa pela acumulada, na ordem
+    W, H, C. Mover: H aceita e vai; W recusa e fica; C recusa e sai rodando. Ficar: W ou H
+    aceita e fica; C recusa e sai rodando. Sair rodando: vizinha sorteada com u_destino
+    pelas preferências, sem a zona atual e sem a recomendada (renormalizadas); se nenhuma
+    sobrar, fica. Sem recomendação: o sem_recomendacao de sempre (o Ashkrof não entra)."""
+    precisa_tempos = True
+    ALTERNATIVAS = ("W", "H", "C")
+    TETO_ESPERA_MIN = 25
+    TETO_CORRIDAS = 14
+
+    def __init__(self, sem_recomendacao="ficar"):
+        super().__init__(modelo=None, regra=None, sem_recomendacao=sem_recomendacao)
+
+    @property
+    def precisa_preferencias(self):
+        return True  # o C sorteia a vizinha pelas preferências
+
+    def espera_min(self, veiculo, ctx):
+        return (ctx.tempo - veiculo.fim_ultima_corrida) * 10
+
+    def utilidades(self, veiculo, recomendada, ctx):
+        espera = min(self.espera_min(veiculo, ctx), self.TETO_ESPERA_MIN)
+        fim_de_semana = 1 if ctx.tipo_dia == "sabado" else 0
+        minutos = 0.0 if recomendada == veiculo.zona else ctx.tempos.minutos(veiculo.zona, recomendada, ctx.hora)
+        familiar = 1 if (veiculo.zona == veiculo.base or veiculo.zona in ctx.grade.vizinhas(veiculo.base)) else 0
+        v_w = 0.207 - 0.022 * espera + 0.322 * 1 + 0.286 * 0 + 0.350 * fim_de_semana
+        v_h = 0.080 * min(veiculo.corridas_feitas, self.TETO_CORRIDAS) - 0.025 * minutos
+        v_c = -0.312 * familiar
+        return v_w, v_h, v_c
+
+    def probabilidades(self, veiculo, recomendada, ctx):
+        """(P(W), P(H), P(C))."""
+        exps = [math.exp(v) for v in self.utilidades(veiculo, recomendada, ctx)]
+        total = sum(exps)
+        return tuple(e / total for e in exps)
+
+    def sair_rodando(self, veiculo, recomendada, ctx, u):
+        """Vizinha pelas preferências, sem a zona atual e sem a recomendada; se não
+        sobrar nenhuma (ou todas com preferência zero), fica."""
+        pref = ctx.preferencias.de(veiculo.base, veiculo.zona, ctx.hora)
+        restantes = [z for z in ctx.grade.vizinhas(veiculo.zona) if z != recomendada]
+        total = sum(pref[z] for z in restantes)
+        if not restantes or total <= 0:
+            return veiculo.zona
+        return pela_acumulada(restantes, [pref[z] / total for z in restantes], u)
+
+    def responder(self, veiculo, recomendacao, ctx, u_aceite, u_destino):
+        if recomendacao is None:
+            return super().responder(veiculo, recomendacao, ctx, u_aceite, u_destino)
+        alternativa = pela_acumulada(self.ALTERNATIVAS, self.probabilidades(veiculo, recomendacao, ctx), u_aceite)
+        if alternativa == "C":
+            return False, self.sair_rodando(veiculo, recomendacao, ctx, u_destino)
+        if recomendacao == veiculo.zona:   # ficar: W ou H obedecem
+            return True, veiculo.zona
+        if alternativa == "H":
+            return True, recomendacao
+        return False, veiculo.zona         # W: recusa e fica

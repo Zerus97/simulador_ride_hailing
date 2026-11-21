@@ -23,8 +23,9 @@ FROTA, PASSOS, AQUECIMENTO = 150, 18, 6   # 3h às 6h
 # cada baseline com o sem_recomendacao que ele exige
 BASELINES = {"sem_movimento": "ficar", "sem_recomendacao": "preferencias",
              "vizinho_aleatorio": "ficar", "gulosa": "ficar"}
-COMBINACOES = list(product(BASELINES, ("fixo", "questionario", "evolutivo"),
-                           ("ficar", "proporcional", "preferida", "quatro_preferidas")))
+COMBINACOES = (list(product(BASELINES, ("fixo", "questionario", "evolutivo"),
+                            ("ficar", "proporcional", "preferida", "quatro_preferidas")))
+               + [(b, "ashkrof", None) for b in BASELINES])  # o Ashkrof decide o destino da recusa
 
 
 @pytest.fixture(scope="module")
@@ -35,7 +36,9 @@ def pedidos():
 
 
 def cenario(algoritmo, modelo, regra):
-    comportamento = {"modelo": modelo, "regra": regra, "sem_recomendacao": BASELINES[algoritmo]}
+    comportamento = {"modelo": modelo, "sem_recomendacao": BASELINES[algoritmo]}
+    if regra is not None:
+        comportamento["regra"] = regra
     if modelo == "fixo":
         comportamento["rho"] = 0.5  # metade recusa: exercita a regra pós-recusa
     if modelo == "evolutivo":

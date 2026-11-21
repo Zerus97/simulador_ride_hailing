@@ -9,6 +9,8 @@ simulador, porque é ele que controla os ids, o total_pedidos e o historico_pedi
 """
 import numpy as np
 
+from environment.calendario import tipo_do_dia
+
 
 class DemandaPoisson:
     """Pedidos de mentira, para os testes: Poisson(lam) pedidos por zona e passo,
@@ -73,6 +75,11 @@ class DemandaRegistros:
                           "duracao_min", "km"]}
             for passo, grupo in do_dia.groupby("passo", sort=True)
         }
+
+    @property
+    def tipo_dia(self):
+        """"util" ou "sabado", pelo calendário (usado pelo comportamento de Ashkrof)."""
+        return tipo_do_dia(self.dia)
 
     def passo_do_dia(self, tempo):
         """O tempo do simulador começa em 1 (o passo() soma 1 antes de chamar a demanda)."""

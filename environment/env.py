@@ -109,6 +109,11 @@ class Veiculo:
         self.estado = OCIOSO
         self.destino = None
         self.chegada = None
+        # estado do motorista para o modelo de Ashkrof (lado do ambiente: a observação
+        # dos algoritmos não mostra): corridas com passageiro já feitas e o passo em que
+        # a última terminou (a espera não zera num reposicionamento)
+        self.corridas_feitas = 0
+        self.fim_ultima_corrida = 0
 
     def __repr__(self):
         return (f"Veiculo(id={self.id}, "

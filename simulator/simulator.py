@@ -41,6 +41,9 @@ class Simulador:
         self.preferencias = preferencias
         if comportamento is None:
             comportamento = Comportamento(AceiteFixo(1.0), Ficar(), sem_recomendacao="ficar")
+        if getattr(comportamento, "precisa_tempos", False) and tempos is None:
+            raise ValueError("o comportamento usa os tempos até a zona recomendada (Ashkrof), "
+                             "mas o simulador não recebeu tempos")
         if comportamento.precisa_preferencias and preferencias is None:
             raise ValueError("o comportamento sorteia pelas preferências (regra Proporcional ou "
                              "sem_recomendacao='preferencias'), mas o simulador não recebeu preferencias")
@@ -143,6 +146,8 @@ class Simulador:
             if self.tempo == corrida.horario_chegada:
                 corrida.veiculo.zona = corrida.pedido.destino
                 corrida.veiculo.estado = OCIOSO
+                corrida.veiculo.corridas_feitas += 1           # só corridas com passageiro
+                corrida.veiculo.fim_ultima_corrida = self.tempo
                 self.corridas_concluidas.append(corrida)
                 self._chegadas.append((corrida.veiculo.id, corrida.veiculo.zona))
             else:
@@ -168,7 +173,9 @@ class Simulador:
         recusas vão para o relatório; os sem recomendação, para nenhum dos dois."""
         self.validar_recomendacoes(moves)
         ctx = Contexto(hora=self.fonte_demanda.passo_do_dia(self.tempo) // 6,
-                       preferencias=self.preferencias, grade=self.grade)
+                       preferencias=self.preferencias, grade=self.grade,
+                       tipo_dia=getattr(self.fonte_demanda, "tipo_dia", None),
+                       tempo=self.tempo, tempos=self.tempos)
         for veiculo in self.veiculos:  # ordem de id
             if veiculo.estado != OCIOSO:
                 continue

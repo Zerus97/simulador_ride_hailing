@@ -42,7 +42,8 @@ from algorithms.hotspot import Hotspot
 from algorithms.sem_movimento import SemMovimento
 from algorithms.sem_recomendacao import SemRecomendacao
 from algorithms.vizinho_aleatorio import VizinhoAleatorio
-from environment.comportamento import (AceiteFixo, Comportamento, ConfiancaEvolutiva, ConfiancaQuestionario,
+from environment.comportamento import (AceiteFixo, Comportamento, ComportamentoAshkrof, ConfiancaEvolutiva,
+                                       ConfiancaQuestionario,
                                        Ficar, Proporcional,
                                        UniformeQuatroPreferidas, ZonaPreferida)
 from environment.env import grade_do_csv, nao_vizinhos_do_csv
@@ -66,7 +67,7 @@ ALGORITMOS = {
     "gulosa": GulosaDemanda,
     "hotspot": Hotspot,
 }
-MODELOS_ACEITE = ("fixo", "questionario", "evolutivo")
+MODELOS_ACEITE = ("fixo", "questionario", "evolutivo", "ashkrof")
 REGRAS = {"ficar": Ficar, "proporcional": Proporcional, "preferida": ZonaPreferida,
           "quatro_preferidas": UniformeQuatroPreferidas}
 LADOS = (1200, 600)
@@ -92,7 +93,7 @@ class Cenario:
     modelo_aceite: str
     rho: float | None
     n0: float | None
-    regra: str
+    regra: str | None
     sem_recomendacao: str
     algoritmo: str
     sementes: tuple
@@ -174,7 +175,11 @@ def validar(dados):
                 obrigatorio=(modelo == "evolutivo"))
     if modelo != "evolutivo" and n0 is not None:
         raise ErroCenario("[comportamento] n0 só vale com modelo = \"evolutivo\"")
-    regra = _campo("comportamento", b, "regra", str, lambda v: v in REGRAS, f"um de {tuple(REGRAS)}")
+    # o Ashkrof decide sozinho para onde vai quem recusa: sem regra pós-recusa
+    regra = _campo("comportamento", b, "regra", str, lambda v: v in REGRAS, f"um de {tuple(REGRAS)}",
+                   obrigatorio=(modelo != "ashkrof"))
+    if modelo == "ashkrof" and regra is not None:
+        raise ErroCenario("[comportamento] regra não vale com modelo = \"ashkrof\" (ele decide o destino da recusa)")
     sem = _campo("comportamento", b, "sem_recomendacao", str,
                  lambda v: v in ("ficar", "preferencias"), "\"ficar\" ou \"preferencias\"")
 
@@ -237,9 +242,12 @@ def montar(cenario, pedidos, semente):
     grade, previsao, tempos, preferencias = _pecas(cenario.lado, cenario.tipo_dia,
                                                    cenario.fracao, cenario.fator_demanda)
     demanda = DemandaRegistros(pedidos, cenario.dia, cenario.fracao_efetiva, cenario.passo_inicial)
-    modelo = {"fixo": lambda: AceiteFixo(cenario.rho), "questionario": ConfiancaQuestionario,
-              "evolutivo": lambda: ConfiancaEvolutiva(cenario.n0)}[cenario.modelo_aceite]()
-    comportamento = Comportamento(modelo, REGRAS[cenario.regra](), sem_recomendacao=cenario.sem_recomendacao)
+    if cenario.modelo_aceite == "ashkrof":
+        comportamento = ComportamentoAshkrof(sem_recomendacao=cenario.sem_recomendacao)
+    else:
+        modelo = {"fixo": lambda: AceiteFixo(cenario.rho), "questionario": ConfiancaQuestionario,
+                  "evolutivo": lambda: ConfiancaEvolutiva(cenario.n0)}[cenario.modelo_aceite]()
+        comportamento = Comportamento(modelo, REGRAS[cenario.regra](), sem_recomendacao=cenario.sem_recomendacao)
     sim = Simulador(grade, cenario.frota, demanda, ALGORITMOS[cenario.algoritmo](), seed=semente,
                     previsao=previsao, tempos=tempos, preferencias=preferencias,
                     comportamento=comportamento, passos_aquecimento=cenario.aquecimento)
