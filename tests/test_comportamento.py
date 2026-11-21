@@ -4,12 +4,15 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from algorithms.contrato import RelatorioDoPasso
+
 from algorithms.algoritmo_reposicionamento import AlgoritmoReposicionamento
 from algorithms.hotspot import Hotspot
 from algorithms.sem_movimento import SemMovimento
 from algorithms.sem_recomendacao import SemRecomendacao
 from environment.comportamento import (OBEDIENCIA_CONTAGENS, OBEDIENCIA_NIVEIS, AceiteFixo,
-                                       Comportamento, ConfiancaQuestionario, Contexto, Ficar,
+                                       Comportamento, ConfiancaEvolutiva, ConfiancaQuestionario, Contexto,
+                                       Ficar,
                                        Proporcional, UniformeQuatroPreferidas, ZonaPreferida,
                                        candidatas)
 from environment.env import REPOSICIONANDO, GradeCelulas, GradeQuadrada, Veiculo
@@ -321,3 +324,98 @@ def test_quatro_preferidas_com_3_candidatas_sorteia_entre_as_3():
     linha = GradeCelulas([(0, 0), (1, 0), (2, 0)])  # a zona 1 tem as vizinhas 0 e 2
     destinos = destinos_com(UniformeQuatroPreferidas(), PrefFixa({1: 0.5, 0: 0.3, 2: 0.2}), grade=linha, zona=1)
     frequencias_batem(destinos, {1: 1 / 3, 0: 1 / 3, 2: 1 / 3})
+
+
+# --- 1.10(b): confiança evolutiva ---
+
+def evolutiva(mu0, n0=10, n=1):
+    """Modelo iniciado com todos os motoristas em μ₀."""
+    modelo = ConfiancaEvolutiva(n0, niveis=[mu0], contagens=[1])
+    modelo.iniciar([Veiculo(i, 0) for i in range(n)], np.random.default_rng(0))
+    return modelo
+
+
+def relatorio(tempo, aceites=(), recusas=(), casados=()):
+    return RelatorioDoPasso(tempo=tempo, casamentos=tuple((v, 100 + v, 0) for v in casados), chegadas=(),
+                            aceites=tuple(aceites), recusas=tuple(recusas))
+
+
+def test_aritmetica_do_beta():
+    m = evolutiva(0.5, n0=10)
+    assert m.confianca(0) == pytest.approx(5 / 10)
+    m.fim_do_passo(relatorio(1, aceites=[0]))
+    m.fim_do_passo(relatorio(2, casados=[0]))          # aceitou em 1, casou em 2: sucesso
+    assert m.confianca(0) == pytest.approx(6 / 11)
+
+    m = evolutiva(0.5, n0=10)
+    m.fim_do_passo(relatorio(1, aceites=[0]))
+    m.fim_do_passo(relatorio(2))                       # não casou em 2: fracasso
+    assert m.confianca(0) == pytest.approx(5 / 11)
+
+
+def test_so_atualiza_quem_aceitou():
+    m = evolutiva(0.5, n0=10, n=3)
+    # 0 aceitou, 1 recusou, 2 sem recomendação; os três casam no passo seguinte
+    m.fim_do_passo(relatorio(1, aceites=[0], recusas=[1]))
+    m.fim_do_passo(relatorio(2, casados=[0, 1, 2]))
+    assert m.confianca(0) == pytest.approx(6 / 11)
+    assert (m.alfa[1], m.beta[1]) == (5, 5) and (m.alfa[2], m.beta[2]) == (5, 5)
+
+
+def test_janela_atendido_so_em_t_mais_2_e_fracasso():
+    m = evolutiva(0.5, n0=10)
+    m.fim_do_passo(relatorio(1, aceites=[0]))
+    m.fim_do_passo(relatorio(2))                       # t + 1: nada
+    m.fim_do_passo(relatorio(3, casados=[0]))          # t + 2: tarde demais (e não aceitou em 2)
+    assert (m.alfa[0], m.beta[0]) == (5, 6)
+
+
+def test_recomendacao_de_ficar_aceita_conta_como_sucesso():
+    # μ₀ = 1: aceita a recomendação de ficar no passo 1; um pedido aparece na zona no passo 2
+    sim = Simulador(GradeQuadrada(5), num_veiculos=1, demanda=DemandaPoisson(0), algoritmo=FicarTodos(), seed=0,
+                    comportamento=Comportamento(ConfiancaEvolutiva(10, niveis=[1.0], contagens=[1]), Ficar()))
+    sim.passo()
+    assert sim.ultimo_relatorio.aceites == (0,)
+    from tests.test_regras import pedido_no_proximo_passo
+    pedido_no_proximo_passo(sim, zona=sim.veiculos[0].zona, destino=sim.veiculos[0].zona)
+    sim.passo()
+    assert sim.ultimo_relatorio.casamentos and sim.comportamento.modelo.alfa[0] == 11
+
+
+def test_extremos_mu0_0_nunca_muda_e_mu0_1_cai_no_primeiro_fracasso():
+    zero = evolutiva(0.0, n0=10)
+    for t in range(1, 30):
+        zero.fim_do_passo(relatorio(t, recusas=[0], casados=[0] if t % 2 else []))
+    assert zero.confianca(0) == 0.0
+
+    um = evolutiva(1.0, n0=10)
+    um.fim_do_passo(relatorio(1, aceites=[0]))
+    um.fim_do_passo(relatorio(2, casados=[0], aceites=[0]))   # sucesso: continua 1
+    assert um.confianca(0) == 1.0
+    um.fim_do_passo(relatorio(3))                             # fracasso
+    assert um.confianca(0) == pytest.approx(11 / 12)
+
+
+def test_n0_enorme_e_a_versao_fixa():
+    def rodada(modelo):
+        sim = Simulador(GradeQuadrada(5), num_veiculos=30, demanda=DemandaPoisson(0.4), algoritmo=Hotspot(),
+                        seed=4, comportamento=Comportamento(modelo, Ficar()))
+        sim.rodar(200)
+        return ([(p.origem, p.destino, p.criado_em) for p in sim.historico_pedidos],
+                [(c.pedido.id, c.veiculo.id) for c in sim.corridas_concluidas + sim.corridas_ativas],
+                [v.zona for v in sim.veiculos], sim.metrics())
+
+    assert rodada(ConfiancaEvolutiva(1e12)) == rodada(ConfiancaQuestionario())
+
+
+def test_confianca_da_frota_e_a_media():
+    sim = Simulador(GradeQuadrada(5), num_veiculos=50, demanda=DemandaPoisson(0.4), algoritmo=FicarTodos(),
+                    seed=1, comportamento=Comportamento(ConfiancaEvolutiva(10), Ficar()), passos_aquecimento=0)
+    sim.rodar(40)
+    m = sim.comportamento.modelo
+    media = np.mean([m.alfa[v] / (m.alfa[v] + m.beta[v]) for v in m.alfa])
+    assert sim.metricas()["confianca_frota"] == pytest.approx(media)
+    assert media != pytest.approx(np.mean(list(m.obediencia.values())))  # a confiança se moveu
+    fixo = Simulador(GradeQuadrada(5), num_veiculos=5, demanda=DemandaPoisson(0.4), algoritmo=FicarTodos(), seed=1)
+    fixo.rodar(5)
+    assert fixo.metricas()["confianca_frota"] is None

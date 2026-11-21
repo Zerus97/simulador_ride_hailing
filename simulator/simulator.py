@@ -237,12 +237,16 @@ class Simulador:
             recusas=tuple(self._recusas),
             movimentos=tuple(self._movimentos),
         )
+        if hasattr(self.comportamento, "fim_do_passo"):
+            self.comportamento.fim_do_passo(self.ultimo_relatorio)  # ex.: confiança evolutiva
         novos = self.historico_pedidos[self._registrados:]
         self._registrados = len(self.historico_pedidos)
         self.coletor.registrar(self.ultimo_relatorio, self.fonte_demanda.passo_do_dia(self.tempo) // 6,
                                novos, self._corridas_novas,
                                estados=Counter(v.estado for v in self.veiculos),
-                               tempo_decisao=tempo_decisao)
+                               tempo_decisao=tempo_decisao,
+                               confianca=(self.comportamento.confianca_media()
+                                          if hasattr(self.comportamento, "confianca_media") else None))
 
     def ociosidade(self):
         """Soma os carros sem passageiro: os OCIOSOS e os REPOSICIONANDO, como antes dos

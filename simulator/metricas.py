@@ -35,11 +35,13 @@ class ColetorMetricas:
         self.estados = {}       # estado -> soma de veículos-passo
         self.num_veiculos = None
         self.tempos_decisao = []
+        self.confianca_final = None   # confiança média da frota no último passo registrado
 
     def fora_do_aquecimento(self, tempo):
         return tempo > self.passos_aquecimento
 
-    def registrar(self, relatorio, hora, pedidos_novos, corridas_novas, estados=None, tempo_decisao=None):
+    def registrar(self, relatorio, hora, pedidos_novos, corridas_novas, estados=None, tempo_decisao=None,
+                  confianca=None):
         """Eventos do passo relatorio.tempo: o relatório, a hora do dia, os pedidos
         criados e as corridas iniciadas (o matching) nesse passo, quantos veículos há em
         cada estado no fim do passo e o tempo de relógio do decidir (s)."""
@@ -57,6 +59,7 @@ class ColetorMetricas:
 
         if estados is not None:
             self.num_veiculos = sum(estados.values())
+        self.confianca_final = confianca  # "no fim do dia": o valor do último passo
         if not self.fora_do_aquecimento(relatorio.tempo):
             return
         self.movimentos.extend((*m, hora) for m in relatorio.movimentos)
@@ -102,6 +105,7 @@ class ColetorMetricas:
             "decisao_media_s": (sum(self.tempos_decisao) / len(self.tempos_decisao)
                                 if self.tempos_decisao else None),
             "decisao_max_s": max(self.tempos_decisao) if self.tempos_decisao else None,
+            "confianca_frota": self.confianca_final,  # None se o modelo de aceite não evolui
         }
 
 

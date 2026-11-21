@@ -42,7 +42,8 @@ from algorithms.hotspot import Hotspot
 from algorithms.sem_movimento import SemMovimento
 from algorithms.sem_recomendacao import SemRecomendacao
 from algorithms.vizinho_aleatorio import VizinhoAleatorio
-from environment.comportamento import (AceiteFixo, Comportamento, ConfiancaQuestionario, Ficar, Proporcional,
+from environment.comportamento import (AceiteFixo, Comportamento, ConfiancaEvolutiva, ConfiancaQuestionario,
+                                       Ficar, Proporcional,
                                        UniformeQuatroPreferidas, ZonaPreferida)
 from environment.env import grade_do_csv, nao_vizinhos_do_csv
 from environment.preferencias import DIAS_POR_TIPO, preferencias_do_csv
@@ -65,7 +66,7 @@ ALGORITMOS = {
     "gulosa": GulosaDemanda,
     "hotspot": Hotspot,
 }
-MODELOS_ACEITE = ("fixo", "questionario")
+MODELOS_ACEITE = ("fixo", "questionario", "evolutivo")
 REGRAS = {"ficar": Ficar, "proporcional": Proporcional, "preferida": ZonaPreferida,
           "quatro_preferidas": UniformeQuatroPreferidas}
 LADOS = (1200, 600)
@@ -90,6 +91,7 @@ class Cenario:
     aquecimento: int
     modelo_aceite: str
     rho: float | None
+    n0: float | None
     regra: str
     sem_recomendacao: str
     algoritmo: str
@@ -162,12 +164,16 @@ def validar(dados):
     if vc["aquecimento"] >= vc["passos"]:
         raise ErroCenario("[cenario] o aquecimento precisa ser menor que o número de passos")
 
-    _sem_extras("comportamento", b, ("modelo", "rho", "regra", "sem_recomendacao"))
+    _sem_extras("comportamento", b, ("modelo", "rho", "n0", "regra", "sem_recomendacao"))
     modelo = _campo("comportamento", b, "modelo", str, lambda v: v in MODELOS_ACEITE, f"um de {MODELOS_ACEITE}")
     rho = _campo("comportamento", b, "rho", float, lambda v: 0 <= v <= 1, "em [0, 1]",
                  obrigatorio=(modelo == "fixo"))
     if modelo != "fixo" and rho is not None:
         raise ErroCenario("[comportamento] rho só vale com modelo = \"fixo\"")
+    n0 = _campo("comportamento", b, "n0", float, lambda v: v > 0, "maior que 0",
+                obrigatorio=(modelo == "evolutivo"))
+    if modelo != "evolutivo" and n0 is not None:
+        raise ErroCenario("[comportamento] n0 só vale com modelo = \"evolutivo\"")
     regra = _campo("comportamento", b, "regra", str, lambda v: v in REGRAS, f"um de {tuple(REGRAS)}")
     sem = _campo("comportamento", b, "sem_recomendacao", str,
                  lambda v: v in ("ficar", "preferencias"), "\"ficar\" ou \"preferencias\"")
@@ -185,7 +191,8 @@ def validar(dados):
                       "lista não vazia de inteiros")
     saida = _campo("execucao", e, "saida", str, lambda v: v.strip() != "", "não pode ser vazio")
 
-    cenario = Cenario(**vc, modelo_aceite=modelo, rho=None if rho is None else float(rho), regra=regra,
+    cenario = Cenario(**vc, modelo_aceite=modelo, rho=None if rho is None else float(rho),
+                      n0=None if n0 is None else float(n0), regra=regra,
                       sem_recomendacao=sem, algoritmo=algoritmo, sementes=tuple(sementes), saida=saida)
     cenario.tipo_dia  # sexta, domingo e dias excluídos dão erro já na leitura
     _guarda_de_vazamento(cenario)
@@ -230,7 +237,8 @@ def montar(cenario, pedidos, semente):
     grade, previsao, tempos, preferencias = _pecas(cenario.lado, cenario.tipo_dia,
                                                    cenario.fracao, cenario.fator_demanda)
     demanda = DemandaRegistros(pedidos, cenario.dia, cenario.fracao_efetiva, cenario.passo_inicial)
-    modelo = (AceiteFixo(cenario.rho) if cenario.modelo_aceite == "fixo" else ConfiancaQuestionario())
+    modelo = {"fixo": lambda: AceiteFixo(cenario.rho), "questionario": ConfiancaQuestionario,
+              "evolutivo": lambda: ConfiancaEvolutiva(cenario.n0)}[cenario.modelo_aceite]()
     comportamento = Comportamento(modelo, REGRAS[cenario.regra](), sem_recomendacao=cenario.sem_recomendacao)
     sim = Simulador(grade, cenario.frota, demanda, ALGORITMOS[cenario.algoritmo](), seed=semente,
                     previsao=previsao, tempos=tempos, preferencias=preferencias,

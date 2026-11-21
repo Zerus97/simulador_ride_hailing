@@ -23,7 +23,7 @@ FROTA, PASSOS, AQUECIMENTO = 150, 18, 6   # 3h às 6h
 # cada baseline com o sem_recomendacao que ele exige
 BASELINES = {"sem_movimento": "ficar", "sem_recomendacao": "preferencias",
              "vizinho_aleatorio": "ficar", "gulosa": "ficar"}
-COMBINACOES = list(product(BASELINES, ("fixo", "questionario"),
+COMBINACOES = list(product(BASELINES, ("fixo", "questionario", "evolutivo"),
                            ("ficar", "proporcional", "preferida", "quatro_preferidas")))
 
 
@@ -38,6 +38,8 @@ def cenario(algoritmo, modelo, regra):
     comportamento = {"modelo": modelo, "regra": regra, "sem_recomendacao": BASELINES[algoritmo]}
     if modelo == "fixo":
         comportamento["rho"] = 0.5  # metade recusa: exercita a regra pós-recusa
+    if modelo == "evolutivo":
+        comportamento["n0"] = 48.0  # "um dia de experiência"
     return validar({
         "cenario": {"nome": f"{algoritmo}-{modelo}-{regra}", "finalidade": "avaliacao", "lado": 1200,
                     "dia": 23, "fracao": 0.15, "fator_demanda": 1.0, "frota": FROTA, "passo_inicial": 18,

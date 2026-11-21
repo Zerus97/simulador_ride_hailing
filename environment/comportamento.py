@@ -107,6 +107,60 @@ class ConfiancaQuestionario(ModeloAceite):
         return self.obediencia[veiculo.id]
 
 
+class ConfiancaEvolutiva(ConfiancaQuestionario):
+    """Confiança evolutiva (atualização Beta do AAVR): cada motorista começa com a
+    obediência do questionário, μ₀ (o mesmo sorteio, gerador e ordem da
+    ConfiancaQuestionario), como um Beta(α = μ₀ · n₀, β = (1 − μ₀) · n₀), e aceita com
+    probabilidade α ÷ (α + β).
+
+    n₀ é a força inicial: n₀ = 48 é "um dia de experiência", a média de aceites por
+    motorista num dia útil (dia 23, 1.500 carros, gulosa recomendando a todos os ociosos,
+    contando também as recomendações de ficar).
+
+    Atualização (regra da Q9), no fim de cada passo, inclusive no aquecimento (é a
+    dinâmica do ambiente): quem aceitou no passo anterior, mover ou ficar, ganha α += 1
+    se aparece nos casamentos deste passo, e β += 1 se não. Quem recusa ou não recebe
+    recomendação não atualiza; por isso μ₀ = 0 nunca aceita nem muda, e μ₀ = 1 aceita até
+    o primeiro fracasso."""
+
+    def __init__(self, n0, niveis=OBEDIENCIA_NIVEIS, contagens=OBEDIENCIA_CONTAGENS):
+        super().__init__(niveis, contagens)
+        if not n0 > 0:
+            raise ValueError(f"n₀ precisa ser maior que 0: {n0}")
+        self.n0 = n0
+        self.alfa = self.beta = None
+        self._aceites_anteriores = ()
+
+    def iniciar(self, veiculos, rng):
+        super().iniciar(veiculos, rng)
+        self.alfa = {vid: mu * self.n0 for vid, mu in self.obediencia.items()}
+        self.beta = {vid: (1 - mu) * self.n0 for vid, mu in self.obediencia.items()}
+        self._aceites_anteriores = ()
+
+    def confianca(self, vid):
+        return self.alfa[vid] / (self.alfa[vid] + self.beta[vid])
+
+    def prob(self, veiculo, zona_recomendada, ctx):
+        if self.alfa is None:
+            raise RuntimeError("ConfiancaEvolutiva sem iniciar(): o simulador sorteia as obediências")
+        return self.confianca(veiculo.id)
+
+    def fim_do_passo(self, relatorio):
+        """Confere os aceites do passo anterior contra os casamentos deste passo e guarda
+        os aceites deste passo para o próximo."""
+        casados = {vid for vid, _, _ in relatorio.casamentos}
+        for vid in self._aceites_anteriores:
+            if vid in casados:
+                self.alfa[vid] += 1
+            else:
+                self.beta[vid] += 1
+        self._aceites_anteriores = tuple(relatorio.aceites)
+
+    def confianca_media(self):
+        """A confiança da frota: a média de α ÷ (α + β) entre os motoristas."""
+        return sum(self.confianca(vid) for vid in self.alfa) / len(self.alfa)
+
+
 # --- regras pós-recusa ---
 
 class RegraPosRecusa:
@@ -175,6 +229,16 @@ class Comportamento:
         de aceite, se ele tiver características por motorista a sortear."""
         if hasattr(self.modelo, "iniciar"):
             self.modelo.iniciar(veiculos, rng)
+
+    def fim_do_passo(self, relatorio):
+        """Chamado pelo Simulador no fim de cada passo, depois do relatório: repassa ao
+        modelo, se ele evolui com o que aconteceu (ex.: ConfiancaEvolutiva)."""
+        if hasattr(self.modelo, "fim_do_passo"):
+            self.modelo.fim_do_passo(relatorio)
+
+    def confianca_media(self):
+        """A confiança média da frota, se o modelo tiver uma; None caso contrário."""
+        return self.modelo.confianca_media() if hasattr(self.modelo, "confianca_media") else None
 
     @property
     def precisa_preferencias(self):

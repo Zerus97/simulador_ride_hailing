@@ -27,7 +27,7 @@ from simulator.metricas import TIPOS_MOVIMENTO
 RAIZ = Path(__file__).resolve().parent.parent
 COLUNAS_PASSO = ["tempo", "passo_do_dia", "pedidos_novos", "casamentos", "expirados",
                  "ociosos", "em_corrida", "reposicionando", "aceites", "recusas",
-                 *(f"mov_{t}" for t in TIPOS_MOVIMENTO), "decisao_s"]
+                 *(f"mov_{t}" for t in TIPOS_MOVIMENTO), "decisao_s", "confianca_frota"]
 
 
 def rodar_semente(cenario, pedidos, semente):
@@ -52,6 +52,7 @@ def rodar_semente(cenario, pedidos, semente):
             "aceites": len(rel.aceites), "recusas": len(rel.recusas),
             **{f"mov_{t}": movimentos[t] for t in TIPOS_MOVIMENTO},
             "decisao_s": sim.ultimo_tempo_decisao,
+            "confianca_frota": sim.comportamento.confianca_media(),
         })
     return sim, pd.DataFrame(linhas, columns=COLUNAS_PASSO)
 

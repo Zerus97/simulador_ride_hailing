@@ -58,8 +58,10 @@ def test_cenario_valido(tmp_path):
     (None, [("comportamento", "rho")], "rho"),                                # rho exigido com "fixo"
     ({("comportamento", "modelo"): "questionario"}, None, "rho"),             # rho proibido sem "fixo"
     ({("algoritmo", "nome"): "sem_recomendacao"}, None, "sem_recomendacao"),  # exigência do algoritmo
+    ({("comportamento", "n0"): 48.0}, None, "n0"),                             # n0 proibido sem "evolutivo"
+    ({("comportamento", "modelo"): "evolutivo"}, [("comportamento", "rho")], "n0"),  # n0 exigido
 ], ids=["faltando", "desconhecido", "algoritmo", "regra", "lado", "tipo", "aquecimento",
-        "rho_faltando", "rho_sobrando", "exigencia"])
+        "rho_faltando", "rho_sobrando", "exigencia", "n0_sobrando", "n0_faltando"])
 def test_erros_de_cenario(tmp_path, mudar, tirar, trecho):
     with pytest.raises(ErroCenario, match=trecho):
         ler_cenario(escrever(tmp_path, mudar, tirar))
@@ -121,3 +123,9 @@ def test_montagem_coerente_no_dia_23(tmp_path):
     a, b = sim.tempos.pares()[0]
     assert all(sim.tempos.minutos(a, b, h) == t_util.minutos(a, b, h) for h in range(24))
     assert sim.cenario is cenario and sim.coletor.passos_aquecimento == 6
+
+
+def test_modelo_evolutivo_no_cenario(tmp_path):
+    c = ler_cenario(escrever(tmp_path, {("comportamento", "modelo"): "evolutivo", ("comportamento", "n0"): 48.0},
+                             tirar=[("comportamento", "rho")]))
+    assert (c.modelo_aceite, c.n0, c.rho) == ("evolutivo", 48.0, None)
