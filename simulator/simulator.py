@@ -11,6 +11,10 @@ class Simulador:
         chegam a cada passo e define o calendário (passo_do_dia); ver simulator/demanda.py.
         previsao e tempos: só repassados aos algoritmos, na observação
         (environment/previsao.py e environment/tempos.py)."""
+        # O modo sequencial (um motorista por vez, i-Rebalance original) só existe na
+        # tarefa 4.6: melhor falhar na construção do que no meio da simulação.
+        if getattr(algoritmo, "sequencial", False):
+            raise NotImplementedError("modo sequencial: tarefa 4.6")
         # Um gerador por fonte de acaso. Os filhos 0, 1 e 2 de spawn(4) são os mesmos
         # de spawn(3): acrescentar o do matching não muda posições, demanda nem aceite.
         sementes = np.random.SeedSequence(seed).spawn(4)

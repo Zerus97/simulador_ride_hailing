@@ -9,3 +9,5 @@ dataset/
 .pytest_cache/
 embarques.png
 cache/
+claude.md
+resumo.md

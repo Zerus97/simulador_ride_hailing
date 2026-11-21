@@ -456,3 +456,19 @@ def test_hotspot_recomenda_para_todos_os_ociosos(seed):
     sim.rodar(200)
     for obs, saida in espiao.pares:
         assert set(saida) == {vid for vid, _ in obs.ociosos}, obs.tempo
+
+
+# --- 1.7(e): o gancho sequencial ---
+
+def test_algoritmo_sequencial_e_recusado_na_construcao():
+    class Sequencial(AlgoritmoReposicionamento):
+        sequencial = True
+
+    with pytest.raises(NotImplementedError, match="4.6"):
+        Simulador(GradeQuadrada(5), num_veiculos=2, demanda=DemandaPoisson(0.4),
+                  algoritmo=Sequencial(), seed=0)
+
+
+@pytest.mark.parametrize("algoritmo", ALGORITMOS)
+def test_algoritmos_existentes_decidem_em_lote(algoritmo):
+    assert algoritmo.sequencial is False
