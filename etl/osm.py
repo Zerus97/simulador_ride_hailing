@@ -1,10 +1,18 @@
 """
 Rede viária de Manhattan (OpenStreetMap) e conferência das velocidades.
 
-python -m etl.osm    baixa a rede (só na primeira vez) e compara, por hora do dia,
-                     a duração registrada das viagens de treino com o tempo do
-                     caminho mínimo no OSM, com as velocidades padrão do OSMnx.
+python -m etl.osm --rede   1.3a: baixa a rede na data fixa (se ainda não houver),
+                           confere e mostra os metadados
+python -m etl.osm          compara, por hora do dia, a duração registrada das viagens
+                           de treino com o tempo do caminho mínimo no OSM, com as
+                           velocidades padrão do OSMnx, e calcula os tempos entre vizinhas
 """
+import json
+from datetime import datetime, timezone
+from importlib.metadata import version
+from pathlib import Path
+
+import networkx as nx
 import numpy as np
 import osmnx as ox
 import pandas as pd
@@ -16,25 +24,120 @@ from etl.grade import celula, para_metros, pontas_em_metros
 from etl.zonas import poligono_manhattan
 
 REDE = DATASET / "manhattan_drive.graphml"
+METADADOS = DATASET / "manhattan_drive.json"
+# Rede "como estava" no início do mês das viagens. O Overpass responde com os dados
+# daquele instante, então quem baixar de novo recebe a mesma rede.
+DATA_REDE = "2016-03-01T00:00:00Z"
+TIPO_REDE = "drive"
 MARGEM_GRAUS = 0.001  # ~100 m além do contorno, para não cortar as vias da margem (FDR, West Side)
 AMOSTRA = 200_000
 SEMENTE = 0
 
+LIMITE_RUA_KMH = 40.2       # 25 mph: ruas sem placa em NYC desde 7/11/2014
+LIMITE_EXPRESSA_KMH = 64.4  # 40 mph: limite da FDR Drive
+VIAS_EXPRESSAS = {"motorway", "trunk"}  # os ramais (_link) ficam com o limite das ruas
+
+
+def tipo_via(highway):
+    """O OSMnx guarda uma lista quando junta trechos de tipos diferentes; vale o primeiro."""
+    return highway[0] if isinstance(highway, list) else highway
+
+
+def adicionar_velocidades(g):
+    """Velocidade de cada trecho pelo tipo de via, com os limites de 2016.
+
+    Ignora o maxspeed do mapa de 2016, que é raro (190 de 9.633 trechos) e tem
+    erros, como 120 mph na FDR (ver arquivo de decisões, seção 2)."""
+    for _, _, dados in g.edges(data=True):
+        expressa = tipo_via(dados["highway"]) in VIAS_EXPRESSAS
+        dados["speed_kph"] = LIMITE_EXPRESSA_KMH if expressa else LIMITE_RUA_KMH
+    return ox.add_edge_travel_times(g)
+
+
+def _timestamp_overpass(desde):
+    """timestamp_osm_base das respostas do Overpass gravadas no cache depois de `desde`."""
+    pasta = Path(ox.settings.cache_folder)
+    stamps = set()
+    for arquivo in pasta.glob("*.json"):
+        if arquivo.stat().st_mtime >= desde:
+            with open(arquivo) as f:
+                inicio = f.read(500)
+            if '"osm3s"' in inicio:
+                stamps.add(inicio.split('"timestamp_osm_base": "')[1].split('"')[0])
+    return sorted(stamps)
+
+
+def baixar_rede():
+    """1.3a: baixa a rede bruta na DATA_REDE e salva graphml + JSON de metadados.
+
+    A rede é salva como veio do OSMnx (sem velocidades e sem o corte no maior
+    componente): os dois são aplicados ao carregar, em preparar_rede(). Assim,
+    mudar uma velocidade não exige baixar a rede de novo."""
+    ox.settings.overpass_settings = f'[out:json][timeout:{{timeout}}]{{maxsize}}[date:"{DATA_REDE}"]'
+    inicio = datetime.now(timezone.utc)
+    bruta = ox.graph_from_polygon(poligono_manhattan().buffer(MARGEM_GRAUS), network_type=TIPO_REDE)
+    ox.save_graphml(bruta, REDE)
+
+    # Se a resposta veio do cache do OSMnx (mesma consulta já feita), não há arquivo
+    # novo no cache: mantém a data da base e do download da primeira vez.
+    stamps = _timestamp_overpass(inicio.timestamp())
+    anterior = metadados()
+    do_cache = not stamps and anterior is not None and anterior.get("data_rede") == DATA_REDE
+    componente = ox.truncate.largest_component(bruta, strongly=True)
+    meta = {
+        "data_rede": DATA_REDE,
+        "overpass_url": ox.settings.overpass_url,
+        "overpass_settings": ox.settings.overpass_settings,
+        "timestamp_osm_base": anterior["timestamp_osm_base"] if do_cache else stamps,
+        "baixado_em": anterior["baixado_em"] if do_cache else inicio.isoformat(timespec="seconds"),
+        "tipo_rede": TIPO_REDE,
+        "margem_graus": MARGEM_GRAUS,
+        "versoes": {p: version(p) for p in ("osmnx", "networkx", "shapely", "geopandas")},
+        "nos_baixados": bruta.number_of_nodes(),
+        "arestas_baixadas": bruta.number_of_edges(),
+        "nos_maior_componente": componente.number_of_nodes(),
+        "arestas_maior_componente": componente.number_of_edges(),
+    }
+    METADADOS.write_text(json.dumps(meta, indent=2, ensure_ascii=False))
+    return bruta
+
+
+def preparar_rede(bruta):
+    """Velocidades pelo tipo de via e só o maior componente fortemente conexo.
+
+    O maior componente garante que de qualquer nó se chega a qualquer outro. Sem
+    isso, um ponto ligado a um beco de mão única não tem caminho para as vizinhas
+    (tempo infinito)."""
+    g = adicionar_velocidades(bruta)
+    g = ox.truncate.largest_component(g, strongly=True)
+    conferir_rede(g)
+    return g
+
+
+def conferir_rede(g):
+    """A rede precisa ser fortemente conexa, ter tempo de viagem positivo em toda
+    aresta e só as velocidades da regra."""
+    assert g.number_of_nodes() > 0, "rede vazia"
+    assert nx.is_strongly_connected(g), "rede não é fortemente conexa"
+    tempos = [d.get("travel_time") for _, _, d in g.edges(data=True)]
+    assert all(t is not None and t > 0 for t in tempos), "aresta sem travel_time positivo"
+    velocidades = {d.get("speed_kph") for _, _, d in g.edges(data=True)}
+    assert velocidades <= {LIMITE_RUA_KMH, LIMITE_EXPRESSA_KMH}, f"velocidade fora da regra: {velocidades}"
+
+
+def metadados():
+    return json.loads(METADADOS.read_text()) if METADADOS.exists() else None
+
 
 def rede():
-    """Rede de ruas para carro, com velocidades (km/h) e tempos (s) padrão do OSMnx.
-
-    Fica só o maior componente fortemente conexo: de qualquer nó se chega a
-    qualquer outro. Sem isso, um ponto ligado a um beco de mão única não tem
-    caminho para as vizinhas (tempo infinito)."""
-    if REDE.exists():
-        g = ox.load_graphml(REDE)
+    """Rede de ruas para carro na DATA_REDE, pronta para uso (velocidades, tempos
+    e maior componente). Baixa a rede bruta se não houver uma salva dessa data."""
+    meta = metadados()
+    if REDE.exists() and meta and meta["data_rede"] == DATA_REDE:
+        bruta = ox.load_graphml(REDE)
     else:
-        g = ox.graph_from_polygon(poligono_manhattan().buffer(MARGEM_GRAUS), network_type="drive")
-        g = ox.add_edge_speeds(g)
-        g = ox.add_edge_travel_times(g)
-        ox.save_graphml(g, REDE)
-    return ox.truncate.largest_component(g, strongly=True)
+        bruta = baixar_rede()
+    return preparar_rede(bruta)
 
 
 def matriz_tempos(g):
@@ -42,7 +145,6 @@ def matriz_tempos(g):
     paralelas fica a mais rápida."""
     dg = ox.convert.to_digraph(g, weight="travel_time")
     nos = list(dg.nodes)
-    import networkx as nx
     return nx.to_scipy_sparse_array(dg, nodelist=nos, weight="travel_time"), nos
 
 
@@ -170,8 +272,20 @@ def resumir(tabela, nome):
 
 
 if __name__ == "__main__":
+    import argparse
+
     from etl.grade import LADOS
     from etl.zonas import origem_grade
+
+    parser = argparse.ArgumentParser(description="Rede viária de Manhattan (OpenStreetMap).")
+    parser.add_argument("--rede", action="store_true",
+                        help="1.3a: só baixa (se preciso) e confere a rede, e mostra os metadados")
+    args = parser.parse_args()
+
+    if args.rede:
+        g = rede()
+        print(json.dumps(metadados(), indent=2, ensure_ascii=False))
+        raise SystemExit
 
     df = pd.read_parquet(SAIDA)
     g = rede()
