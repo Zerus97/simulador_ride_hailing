@@ -23,7 +23,8 @@ FROTA, PASSOS, AQUECIMENTO = 150, 18, 6   # 3h às 6h
 # cada baseline com o sem_recomendacao que ele exige
 BASELINES = {"sem_movimento": "ficar", "sem_recomendacao": "preferencias",
              "vizinho_aleatorio": "ficar", "gulosa": "ficar"}
-COMBINACOES = list(product(BASELINES, ("fixo", "questionario"), ("ficar", "proporcional")))
+COMBINACOES = list(product(BASELINES, ("fixo", "questionario"),
+                           ("ficar", "proporcional", "preferida", "quatro_preferidas")))
 
 
 @pytest.fixture(scope="module")

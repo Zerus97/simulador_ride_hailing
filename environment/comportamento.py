@@ -38,6 +38,13 @@ def pela_acumulada(zonas, probs, u):
     return zonas[-1]  # arredondamento: a soma pode dar 0,999...
 
 
+def por_preferencia(veiculo, ctx):
+    """As candidatas da maior para a menor preferência; o empate fica com a ordem das
+    candidatas (a zona atual primeiro, depois a de grade.vizinhas), porque sorted é estável."""
+    pref = ctx.preferencias.de(veiculo.base, veiculo.zona, ctx.hora)
+    return sorted(candidatas(veiculo.zona, ctx.grade), key=lambda z: -pref[z])
+
+
 def pelas_preferencias(veiculo, ctx, u):
     """Sorteia entre a zona atual e as vizinhas pelas preferências do motorista na hora."""
     pref = ctx.preferencias.de(veiculo.base, veiculo.zona, ctx.hora)
@@ -124,6 +131,29 @@ class Proporcional(RegraPosRecusa):
 
     def destino(self, veiculo, zona_recomendada, ctx, u):
         return pelas_preferencias(veiculo, ctx, u)
+
+
+class ZonaPreferida(RegraPosRecusa):
+    """Quem recusa vai para a candidata de maior preferência (a zona atual ou uma
+    vizinha); empate pela ordem das candidatas. Não sorteia: o u não é usado, mas o
+    simulador continua tirando os dois números, para não mudar o contrato."""
+    precisa_preferencias = True
+
+    def destino(self, veiculo, zona_recomendada, ctx, u):
+        return por_preferencia(veiculo, ctx)[0]
+
+
+class UniformeQuatroPreferidas(RegraPosRecusa):
+    """Quem recusa sorteia por igual entre as 4 candidatas de maior preferência (todas,
+    se houver menos de 4). A zona atual e a recomendada podem estar entre elas, como no
+    i-Rebalance. As 4 são ordenadas antes do sorteio (preferência, depois a ordem das
+    candidatas), o que torna o resultado reprodutível: índice = int(u × quantas)."""
+    precisa_preferencias = True
+    QUANTAS = 4
+
+    def destino(self, veiculo, zona_recomendada, ctx, u):
+        preferidas = por_preferencia(veiculo, ctx)[:self.QUANTAS]
+        return preferidas[int(u * len(preferidas))]
 
 
 # --- o comportamento ---

@@ -10,9 +10,9 @@ from algorithms.sem_movimento import SemMovimento
 from algorithms.sem_recomendacao import SemRecomendacao
 from environment.comportamento import (OBEDIENCIA_CONTAGENS, OBEDIENCIA_NIVEIS, AceiteFixo,
                                        Comportamento, ConfiancaQuestionario, Contexto, Ficar,
-                                       Proporcional,
+                                       Proporcional, UniformeQuatroPreferidas, ZonaPreferida,
                                        candidatas)
-from environment.env import REPOSICIONANDO, GradeQuadrada, Veiculo
+from environment.env import REPOSICIONANDO, GradeCelulas, GradeQuadrada, Veiculo
 from environment.preferencias import Preferencias
 from simulator.demanda import DemandaPoisson
 from simulator.simulator import Simulador
@@ -265,3 +265,59 @@ def test_tabela_bate_com_o_questionaire_csv():
     contagem = q.groupby("DriverID")["obey"].first().value_counts().sort_index()
     assert tuple(contagem.index) == pytest.approx(OBEDIENCIA_NIVEIS)
     assert tuple(contagem.values) == OBEDIENCIA_CONTAGENS
+
+
+# --- 1.10(a): zona preferida e uniforme entre as 4 preferidas ---
+
+class PrefFixa:
+    """Preferências dadas à mão: o mesmo {zona: probabilidade} para qualquer base e hora."""
+
+    def __init__(self, probs):
+        self.probs = probs
+
+    def de(self, base, zona_atual, hora):
+        return self.probs
+
+
+# na grade 3 × 3, as candidatas da zona 4 são [4, 1, 7, 3, 5, 0, 2, 6, 8] (a ordem de DIRECOES)
+PREF_EMPATE = PrefFixa({4: 0.05, 1: 0.05, 7: 0.25, 3: 0.25, 5: 0.15, 0: 0.10, 2: 0.10, 6: 0.03, 8: 0.02})
+
+
+def destinos_com(regra, pref, grade=GRADE3, zona=4, n=20_000, seed=0):
+    veiculo = Veiculo(0, zona)
+    ctx = Contexto(hora=9, preferencias=pref, grade=grade)
+    comport = comportamento(0.0, regra)
+    rng = np.random.default_rng(seed)
+    return [comport.responder(veiculo, zona, ctx, rng.random(), rng.random())[1] for _ in range(n)]
+
+
+def test_zona_preferida_e_a_de_maior_preferencia():
+    esperado = max(candidatas(4, GRADE3), key=lambda z: PREF.de(8, 4, 9)[z])
+    veiculo = Veiculo(0, 4)
+    veiculo.base = 8
+    ctx = Contexto(hora=9, preferencias=PREF, grade=GRADE3)
+    assert ZonaPreferida().destino(veiculo, 1, ctx, u=0.99) == esperado
+
+
+def test_zona_preferida_empate_pela_ordem_das_candidatas():
+    # 7 e 3 empatam em 0,25; o 7 vem antes nas candidatas
+    assert set(destinos_com(ZonaPreferida(), PREF_EMPATE, n=50)) == {7}
+
+
+def test_zona_preferida_nao_muda_entre_sementes():
+    # destinos_com usa um veículo na zona 4 com base 4
+    assert {d for seed in range(20) for d in destinos_com(ZonaPreferida(), PREF, n=5, seed=seed)} == \
+           {max(candidatas(4, GRADE3), key=lambda z: PREF.de(4, 4, 9)[z])}
+
+
+def test_quatro_preferidas_uniforme_entre_as_4_maiores():
+    # as 4 maiores: 7 e 3 (0,25), 5 (0,15), e 0 e 2 empatam em 0,10 -> o 0 vem antes
+    destinos = destinos_com(UniformeQuatroPreferidas(), PREF_EMPATE)
+    assert set(destinos) == {7, 3, 5, 0}
+    frequencias_batem(destinos, {7: 0.25, 3: 0.25, 5: 0.25, 0: 0.25})
+
+
+def test_quatro_preferidas_com_3_candidatas_sorteia_entre_as_3():
+    linha = GradeCelulas([(0, 0), (1, 0), (2, 0)])  # a zona 1 tem as vizinhas 0 e 2
+    destinos = destinos_com(UniformeQuatroPreferidas(), PrefFixa({1: 0.5, 0: 0.3, 2: 0.2}), grade=linha, zona=1)
+    frequencias_batem(destinos, {1: 1 / 3, 0: 1 / 3, 2: 1 / 3})

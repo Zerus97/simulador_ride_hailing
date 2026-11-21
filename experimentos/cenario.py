@@ -42,7 +42,8 @@ from algorithms.hotspot import Hotspot
 from algorithms.sem_movimento import SemMovimento
 from algorithms.sem_recomendacao import SemRecomendacao
 from algorithms.vizinho_aleatorio import VizinhoAleatorio
-from environment.comportamento import AceiteFixo, Comportamento, ConfiancaQuestionario, Ficar, Proporcional
+from environment.comportamento import (AceiteFixo, Comportamento, ConfiancaQuestionario, Ficar, Proporcional,
+                                       UniformeQuatroPreferidas, ZonaPreferida)
 from environment.env import grade_do_csv, nao_vizinhos_do_csv
 from environment.preferencias import DIAS_POR_TIPO, preferencias_do_csv
 from environment.previsao import previsao_do_csv
@@ -65,7 +66,8 @@ ALGORITMOS = {
     "hotspot": Hotspot,
 }
 MODELOS_ACEITE = ("fixo", "questionario")
-REGRAS = {"ficar": Ficar, "proporcional": Proporcional}
+REGRAS = {"ficar": Ficar, "proporcional": Proporcional, "preferida": ZonaPreferida,
+          "quatro_preferidas": UniformeQuatroPreferidas}
 LADOS = (1200, 600)
 FINALIDADES = ("avaliacao", "ajuste")
 
