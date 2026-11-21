@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from etl.grade import para_latlon
-from etl.osm import adicionar_velocidades, pontos_mediana
+from etl.osm import adicionar_velocidades, nao_vizinhos, pontos_mediana
 
 
 def test_velocidade_pelo_tipo_ignora_maxspeed():
@@ -60,3 +60,20 @@ def test_pontos_mediana_celula_sem_viagens_da_erro():
     grade = pd.DataFrame({"linha": [0, 0, 1], "coluna": [0, 1, 0]})
     with pytest.raises(KeyError, match=r"\(1, 0\)"):
         pontos_mediana(VIAGENS, grade, LADO, ORIGEM)
+
+
+# --- nao_vizinhos (1.3d) ---
+
+def test_nao_vizinhos_um_sentido_fronteira_e_sem_repeticao():
+    # A = (0, 0), B = (0, 1), C = (1, 0); tempos pelo OSM nos dois sentidos
+    linhas = [((0, 0), (0, 1), 3.0), ((0, 1), (0, 0), 4.0),    # A-B: 4,0 x 4 = 16,0 -> sai (basta um sentido)
+              ((0, 0), (1, 0), 3.75), ((1, 0), (0, 0), 3.0),   # A-C: 3,75 x 4 = 15,0 -> sai (a regra é >= 15)
+              ((0, 1), (1, 0), 3.0), ((1, 0), (0, 1), 3.7)]    # B-C: 3,7 x 4 = 14,8 -> fica
+    tempos = pd.DataFrame([{"linha_a": a[0], "coluna_a": a[1], "linha_b": b[0], "coluna_b": b[1],
+                            "osm_min": m} for a, b, m in linhas])
+
+    excluidos = nao_vizinhos(tempos, maior_fator=4.0)
+
+    pares = list(zip(excluidos["linha_a"], excluidos["coluna_a"], excluidos["linha_b"], excluidos["coluna_b"]))
+    assert pares == [(0, 0, 0, 1), (0, 0, 1, 0)]
+    assert excluidos["calibrado_pior_min"].tolist() == pytest.approx([16.0, 15.0])

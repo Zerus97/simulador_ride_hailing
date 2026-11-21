@@ -98,7 +98,7 @@ class Veiculo:
                 f"Zona = {self.zona}, "
                 f"Ocioso={self.ocioso})")
 
-class Pedido: # Custo precisa ser calculado baseado na distancia entre origem e destino
+class Pedido:
     """Um pedido que tem uma origem, destino e custo"""
     def __init__(self, id_pedido, cliente, origem, destino, custo, timestep):
         self.id = id_pedido
@@ -114,7 +114,7 @@ class Pedido: # Custo precisa ser calculado baseado na distancia entre origem e 
                 f"{self.origem}->{self.destino}, "
                 f"custo={self.custo})")
     
-class Corrida: # Como calcular horário de chegada?
+class Corrida:
     """Um corrida que tem um veículo e um pedido a ser atendido"""
     def __init__(self, veiculo, pedido, timestep):
         self.veiculo = veiculo
