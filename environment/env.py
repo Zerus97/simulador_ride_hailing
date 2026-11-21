@@ -1,6 +1,14 @@
 import csv
 
 from environment.grafo_zonas import GrafoZonas
+from environment.tempo import espera_min, passos_da_corrida
+
+# Estados do veículo:
+#   OCIOSO --matching--> EM_CORRIDA --chegada (n passos)--> OCIOSO
+#   OCIOSO --recomendação de mover--> REPOSICIONANDO --passo seguinte--> OCIOSO
+OCIOSO = "ocioso"                  # parado numa zona: disponível para matching e recomendações
+EM_CORRIDA = "em_corrida"          # levando um passageiro: a duração registrada, em passos
+REPOSICIONANDO = "reposicionando"  # indo vazio para uma vizinha: sempre 1 passo
 
 # Vizinhança das grades: cima, baixo, esquerda, direita e diagonais.
 # A ordem importa: é a ordem de vizinhas(), e o Hotspot desempata por ela.
@@ -86,17 +94,22 @@ def nao_vizinhos_do_csv(caminho):
 
 
 class Veiculo:
-    """Um veiculo que fica numa zona e pode estar ocioso ou ocupado."""
+    """Um veículo numa zona, em um dos três estados: OCIOSO, EM_CORRIDA ou REPOSICIONANDO.
+
+    destino e chegada só valem durante o reposicionamento: a zona para onde vai e o
+    passo em que chega. Até lá, zona continua sendo a de origem."""
 
     def __init__(self, id_veiculo, zona):
         self.id = id_veiculo
         self.zona = zona
-        self.ocioso = True
-    
+        self.estado = OCIOSO
+        self.destino = None
+        self.chegada = None
+
     def __repr__(self):
         return (f"Veiculo(id={self.id}, "
                 f"Zona = {self.zona}, "
-                f"Ocioso={self.ocioso})")
+                f"Estado={self.estado})")
 
 class Pedido:
     """Um pedido que tem uma origem, destino e custo.
@@ -128,7 +141,12 @@ class Corrida:
     def __init__(self, veiculo, pedido, timestep):
         self.veiculo = veiculo
         self.pedido = pedido
-        self.horario_chegada = timestep + 1
+        # a duração registrada, em passos (pedidos da Poisson, sem duração: 1 passo)
+        self.horario_chegada = timestep + passos_da_corrida(pedido.duracao_min)
+        # espera em minutos, do horário real do pedido até o fim do passo do atendimento
+        # (timestep); os pedidos da Poisson não têm horário: None
+        self.espera_min = (None if pedido.segundo_do_dia is None
+                           else espera_min(pedido.segundo_do_dia, timestep - pedido.criado_em))
 
     def __repr__(self):
         return (

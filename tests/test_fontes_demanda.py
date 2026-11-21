@@ -103,3 +103,19 @@ def test_dia_real_tem_cerca_de_15_por_cento(dia):
     n = ((pedidos["dia"] == dia) & pedidos["passo"].between(18, 18 + passos - 1)).sum()
     esperado, desvio = 0.15 * n, np.sqrt(n * 0.15 * 0.85)
     assert abs(sim.total_pedidos - esperado) < 4 * desvio, (sim.total_pedidos, esperado)
+
+
+def test_espera_do_dia_real_fica_entre_0_e_20_min():
+    # dia útil real (23/mar), das 3h às 24h; frota pequena, para muitas esperas chegarem a w = 1
+    pedidos_arq, grade_arq = DATASET / "pedidos_1200.parquet", DATASET / "grade_1200.csv"
+    if not (pedidos_arq.exists() and grade_arq.exists()):
+        pytest.skip("dataset fora do repositório")
+    fonte = DemandaRegistros(pd.read_parquet(pedidos_arq), dia=23, fracao=0.15, passo_inicial=18)
+    sim = Simulador(grade_do_csv(grade_arq), num_veiculos=500, demanda=fonte,
+                    algoritmo=SemMovimento(), seed=0)
+
+    sim.rodar(126)
+
+    esperas = [c.espera_min for c in sim.corridas_ativas + sim.corridas_concluidas]
+    assert len(esperas) > 10_000
+    assert all(0 <= e <= 20 for e in esperas), (min(esperas), max(esperas))

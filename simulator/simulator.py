@@ -1,6 +1,6 @@
 from collections import Counter, deque
 import numpy as np
-from environment.env import Veiculo, Pedido, Corrida
+from environment.env import EM_CORRIDA, OCIOSO, REPOSICIONANDO, Corrida, Pedido, Veiculo
 
 class Simulador:
     """Junta a grade e os veiculos, e faz o tempo avancar em passos."""
@@ -50,27 +50,39 @@ class Simulador:
 
     def matching(self):
         for v in self.veiculos:
-            if v.ocioso and self.pedidos[v.zona]:
-                v.ocioso = False
+            if v.estado == OCIOSO and self.pedidos[v.zona]:
+                v.estado = EM_CORRIDA
                 pedido = self.pedidos[v.zona].popleft()
                 self.corridas_ativas.append(Corrida(v, pedido, self.tempo))
     
     def arrivals(self):
+        """Libera as corridas que chegam neste passo e os carros que terminam de se
+        reposicionar: os dois ficam OCIOSOS na zona de destino, antes do matching."""
         restantes = []
         for corrida in self.corridas_ativas:
             if self.tempo == corrida.horario_chegada:
                 corrida.veiculo.zona = corrida.pedido.destino
-                corrida.veiculo.ocioso = True
+                corrida.veiculo.estado = OCIOSO
                 self.corridas_concluidas.append(corrida)
             else:
                 restantes.append(corrida)
         self.corridas_ativas = restantes
 
+        for v in self.veiculos:
+            if v.estado == REPOSICIONANDO and v.chegada == self.tempo:
+                v.zona, v.estado, v.destino, v.chegada = v.destino, OCIOSO, None, None
+
     def repositioning(self, moves):
+        """Recomendação para outra zona: o carro sai REPOSICIONANDO e chega no passo
+        seguinte (1 passo). Para a própria zona (ou None), é ficar: nada muda.
+        Ainda não há recusa (tarefa 1.9): toda recomendação é executada."""
         for veiculo in self.veiculos:
             destino = moves.get(veiculo.id)
-            if destino is not None:
-                veiculo.zona = destino
+            if destino is not None and destino != veiculo.zona:
+                assert veiculo.estado == OCIOSO, f"recomendação para veículo não ocioso: {veiculo}"
+                veiculo.estado = REPOSICIONANDO
+                veiculo.destino = destino
+                veiculo.chegada = self.tempo + 1
 
     def expire(self):
         for zona, lista in self.pedidos.items():
@@ -96,8 +108,10 @@ class Simulador:
         self.ociosidade()
 
     def ociosidade(self):
-        """Calcula a ociosidade"""
-        self.ociosidades = (self.ociosidades + sum(1 for v in self.veiculos if v.ocioso))
+        """Soma os carros sem passageiro: os OCIOSOS e os REPOSICIONANDO, como antes dos
+        estados (um carro movido continuava ocioso no fim do passo). Separar parado de
+        reposicionando é decisão das métricas (tarefa 1.12)."""
+        self.ociosidades = (self.ociosidades + sum(1 for v in self.veiculos if v.estado != EM_CORRIDA))
 
 
     def rodar(self, passos):
@@ -140,5 +154,5 @@ class Simulador:
         return [
             (v.id, v.zona)
             for v in self.veiculos
-            if v.ocioso == ociosos
+            if (v.estado == OCIOSO) == ociosos
         ]

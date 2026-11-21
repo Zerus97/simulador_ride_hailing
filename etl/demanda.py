@@ -17,12 +17,10 @@ carrega converte para int64 (no simulador, tarefa 1.4c).
 import numpy as np
 import pandas as pd
 
+from environment.tempo import PASSOS_POR_DIA, SEGUNDOS_POR_PASSO
 from etl.etl import DATASET, DIAS_TREINO, KM_POR_MILHA, SABADOS_TREINO, SAIDA, duracao_min
 from etl.grade import LADOS, celula, pontas_em_metros
 from etl.zonas import origem_grade
-
-SEGUNDOS_POR_PASSO = 600  # passos de 10 min: 144 por dia
-PASSOS_POR_DIA = 24 * 3600 // SEGUNDOS_POR_PASSO
 
 
 def pedidos_da_grade(df, grade, lado, origem):
@@ -59,7 +57,7 @@ TIPOS_DE_DIA = {"util": DIAS_TREINO, "sabado": SABADOS_TREINO}
 
 
 def previsao_lambda(pedidos, grade, tipos=TIPOS_DE_DIA):
-    """Tabela DENSA: toda célula da grade × todo passo (0 a 143) × cada tipo de dia
+    """Tabela DENSA: toda célula da grade x todo passo (0 a 143) x cada tipo de dia
     (coluna tipo_dia, para não confundir com o dia do mês da tabela de pedidos), com
     pedidos_medios = pedidos com origem na célula naquele passo, somados nos dias do
     tipo, ÷ número de dias do tipo. Zero onde não houve pedido.

@@ -1,6 +1,6 @@
 import pytest
 
-from environment.env import GradeQuadrada
+from environment.env import EM_CORRIDA, OCIOSO, REPOSICIONANDO, GradeQuadrada
 from simulator.demanda import DemandaPoisson
 from simulator.simulator import Simulador
 from algorithms.hotspot import Hotspot
@@ -37,9 +37,12 @@ def test_veiculos_ociosos_mais_em_corrida_e_a_frota(algoritmo, seed):
     for _ in range(200):
         sim.passo()
 
-        ociosos = sum(1 for v in sim.veiculos if v.ocioso)
+        # três estados: ociosos + em corrida + reposicionando = a frota
+        ociosos = sum(1 for v in sim.veiculos if v.estado == OCIOSO)
+        reposicionando = sum(1 for v in sim.veiculos if v.estado == REPOSICIONANDO)
         em_corrida = len(sim.corridas_ativas)
-        assert ociosos + em_corrida == len(sim.veiculos), f"t={sim.tempo}"
+        assert ociosos + em_corrida + reposicionando == len(sim.veiculos), f"t={sim.tempo}"
+        assert em_corrida == sum(1 for v in sim.veiculos if v.estado == EM_CORRIDA), f"t={sim.tempo}"
 
 
 @pytest.mark.parametrize("algoritmo", ALGORITMOS)
