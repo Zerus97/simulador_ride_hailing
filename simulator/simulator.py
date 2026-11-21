@@ -6,9 +6,11 @@ from environment.env import EM_CORRIDA, OCIOSO, REPOSICIONANDO, Corrida, Pedido,
 class Simulador:
     """Junta a grade e os veiculos, e faz o tempo avancar em passos."""
 
-    def __init__(self, grade, num_veiculos, demanda, algoritmo, seed=None):
+    def __init__(self, grade, num_veiculos, demanda, algoritmo, seed=None, previsao=None, tempos=None):
         """demanda: a fonte de demanda (ex.: DemandaPoisson), que diz quais pedidos
-        chegam a cada passo; ver simulator/demanda.py."""
+        chegam a cada passo e define o calendário (passo_do_dia); ver simulator/demanda.py.
+        previsao e tempos: só repassados aos algoritmos, na observação
+        (environment/previsao.py e environment/tempos.py)."""
         # Um gerador por fonte de acaso. Os filhos 0, 1 e 2 de spawn(4) são os mesmos
         # de spawn(3): acrescentar o do matching não muda posições, demanda nem aceite.
         sementes = np.random.SeedSequence(seed).spawn(4)
@@ -17,6 +19,8 @@ class Simulador:
         self.rng_aceite  = np.random.default_rng(sementes[2])
         self.rng_matching = np.random.default_rng(sementes[3])
         self.grade = grade
+        self.previsao = previsao
+        self.tempos = tempos
         self.tempo = 0
         self.fonte_demanda = demanda
         self.pedidos = {zona: deque() for zona in self.grade.zonas()}
@@ -218,6 +222,9 @@ class Simulador:
             chegadas=chegadas,
             grade=self.grade,
             relatorio=self.ultimo_relatorio,
+            passo_do_dia=self.fonte_demanda.passo_do_dia(self.tempo),
+            previsao=self.previsao,
+            tempos=self.tempos,
         )
 
     def listar_veiculos(self, ociosos=True):

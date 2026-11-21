@@ -14,8 +14,13 @@ class DemandaPoisson:
     """Pedidos de mentira, para os testes: Poisson(lam) pedidos por zona e passo,
     com destino sorteado entre as outras zonas."""
 
-    def __init__(self, lam):
+    def __init__(self, lam, passo_inicial=0):
         self.lam = lam
+        self.passo_inicial = passo_inicial
+
+    def passo_do_dia(self, tempo):
+        """O calendário do dia simulado, a mesma interface da DemandaRegistros (não sorteia)."""
+        return self.passo_inicial + (tempo - 1)
 
     def gerar(self, tempo, grade, rng):
         """Lista de pedidos novos do passo `tempo`, como dicionários (origem, destino, custo).

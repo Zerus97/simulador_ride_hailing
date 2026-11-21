@@ -11,6 +11,8 @@ from collections import Counter
 from dataclasses import dataclass
 
 from environment.env import GradeCelulas
+from environment.previsao import PrevisaoConstante, PrevisaoDemanda
+from environment.tempos import TemposEntreZonas
 
 
 @dataclass(frozen=True)
@@ -44,3 +46,6 @@ class Observacao:
     chegadas: Counter        # (zona, passo de chegada) -> carros em corrida
     grade: GradeCelulas
     relatorio: RelatorioDoPasso | None = None  # o do passo anterior; None no primeiro passo
+    passo_do_dia: int | None = None            # 0 a 143 (pode passar de 143 na última decisão)
+    previsao: PrevisaoDemanda | PrevisaoConstante | None = None  # previsao.lam(zona, passo_do_dia)
+    tempos: TemposEntreZonas | None = None     # tempos.minutos(a, b, passo_do_dia // 6), tempos.km(a, b)
