@@ -1,0 +1,58 @@
+{
+  "regra": "frota da grade 1000–2500 (passo 100) mais perto de 0.75 no atendimento médio dos dias úteis de treino [1, 2, 3, 7, 8, 9, 10]",
+  "frota": 1500,
+  "treino": {
+    "atendimento_medio": 0.7560429366740061,
+    "desvio_entre_dias": 0.01257608569814181
+  },
+  "avaliacao": {
+    "19": {
+      "media": 0.8084750580644441,
+      "desvio": 0.008559600627997935,
+      "sementes": 10
+    },
+    "23": {
+      "media": 0.7640797251452138,
+      "desvio": 0.006170715925002553,
+      "sementes": 10
+    }
+  },
+  "execucao": {
+    "cenario": {
+      "nome": "frota_1500_dia_23",
+      "finalidade": "avaliacao",
+      "lado": 1200,
+      "dia": 23,
+      "fracao": 0.15,
+      "fator_demanda": 1.0,
+      "frota": 1500,
+      "passo_inicial": 18,
+      "passos": 126,
+      "aquecimento": 6,
+      "modelo_aceite": "fixo",
+      "rho": 1.0,
+      "regra": "ficar",
+      "sem_recomendacao": "ficar",
+      "algoritmo": "sem_movimento",
+      "sementes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "saida": "resultados/calibracao_frota"
+    },
+    "commit": "bacaae7be9aaa1d5d57fd8aaa025bd8e82473585",
+    "alteracoes_nao_commitadas": true,
+    "python": "3.12.2",
+    "numpy": "2.5.1",
+    "data": "2026-11-21T16:59:22"
+  },
+  "duracao_s": 122
+}
