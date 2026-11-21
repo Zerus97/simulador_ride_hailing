@@ -99,8 +99,14 @@ class Veiculo:
                 f"Ocioso={self.ocioso})")
 
 class Pedido:
-    """Um pedido que tem uma origem, destino e custo"""
-    def __init__(self, id_pedido, cliente, origem, destino, custo, timestep):
+    """Um pedido que tem uma origem, destino e custo.
+
+    Os pedidos das viagens reais (DemandaRegistros) trazem também o horário real
+    (segundo_do_dia), a duração registrada (duracao_min) e a distância (km), usados no
+    tempo de espera, na duração das corridas (tarefa 1.5) e na tarifa (1.12). A
+    DemandaPoisson não os usa: ficam None."""
+    def __init__(self, id_pedido, cliente, origem, destino, custo, timestep,
+                 segundo_do_dia=None, duracao_min=None, km=None):
         self.id = id_pedido
         self.cliente = cliente
         self.origem = origem
@@ -108,6 +114,9 @@ class Pedido:
         self.custo = custo
         self.criado_em = timestep
         self.expira = self.criado_em + 2
+        self.segundo_do_dia = segundo_do_dia
+        self.duracao_min = duracao_min
+        self.km = km
     
     def __repr__(self):
         return (f"Pedido(id={self.id}, "

@@ -1,15 +1,16 @@
 from environment.env import GradeQuadrada
+from simulator.demanda import DemandaPoisson
 from simulator.simulator import Simulador
 from algorithms.hotspot import Hotspot
 from algorithms.sem_movimento import SemMovimento
 
 
 def criar_simulador_1(seed=0, num_veiculos=10):
-    return Simulador(GradeQuadrada(5), num_veiculos=num_veiculos, lam=0.4,
+    return Simulador(GradeQuadrada(5), num_veiculos=num_veiculos, demanda=DemandaPoisson(0.4),
                      algoritmo=Hotspot(), seed=seed)
 
 def criar_simulador_2(seed=0, num_veiculos=10):
-    return Simulador(GradeQuadrada(5), num_veiculos=num_veiculos, lam=0.4,
+    return Simulador(GradeQuadrada(5), num_veiculos=num_veiculos, demanda=DemandaPoisson(0.4),
                      algoritmo=SemMovimento(), seed=seed)
 
 

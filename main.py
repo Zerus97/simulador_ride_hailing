@@ -2,6 +2,7 @@ from algorithms.hotspot import Hotspot
 from algorithms.sem_movimento import SemMovimento
 import argparse
 from environment.env import GradeQuadrada
+from simulator.demanda import DemandaPoisson
 from simulator.simulator import Simulador
 
 if __name__ == "__main__":
@@ -28,7 +29,7 @@ if __name__ == "__main__":
     algoritmo = ALGORITMOS[args.algoritmo]()
 
     grade = GradeQuadrada(size=args.size)                 # Exemplo cidade 5x5 = 25 zonas
-    sim = Simulador(grade, num_veiculos=args.veiculos, lam=args.lam, algoritmo=algoritmo, seed=args.seed)
+    sim = Simulador(grade, num_veiculos=args.veiculos, demanda=DemandaPoisson(args.lam), algoritmo=algoritmo, seed=args.seed)
     print(f"Simulador criado: {len(grade.zonas())} zonas, {len(sim.veiculos)} veiculos")
     sim.rodar(passos=args.passos)
     print(sim.metrics())

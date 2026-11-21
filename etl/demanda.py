@@ -59,7 +59,8 @@ TIPOS_DE_DIA = {"util": DIAS_TREINO, "sabado": SABADOS_TREINO}
 
 
 def previsao_lambda(pedidos, grade, tipos=TIPOS_DE_DIA):
-    """Tabela DENSA: toda célula da grade × todo passo (0 a 143) × cada tipo de dia, com
+    """Tabela DENSA: toda célula da grade × todo passo (0 a 143) × cada tipo de dia
+    (coluna tipo_dia, para não confundir com o dia do mês da tabela de pedidos), com
     pedidos_medios = pedidos com origem na célula naquele passo, somados nos dias do
     tipo, ÷ número de dias do tipo. Zero onde não houve pedido.
 
@@ -75,10 +76,10 @@ def previsao_lambda(pedidos, grade, tipos=TIPOS_DE_DIA):
             [(p, l, c) for p in range(PASSOS_POR_DIA) for l, c in celulas],
             names=["passo", "linha_o", "coluna_o"])
         media = soma.reindex(indice, fill_value=0) / len(dias)
-        partes.append(media.rename("pedidos_medios").reset_index().assign(dia=tipo))
+        partes.append(media.rename("pedidos_medios").reset_index().assign(tipo_dia=tipo))
     tabela = pd.concat(partes, ignore_index=True)
     tabela = tabela.rename(columns={"linha_o": "linha", "coluna_o": "coluna"})
-    return tabela[["dia", "passo", "linha", "coluna", "pedidos_medios"]]
+    return tabela[["tipo_dia", "passo", "linha", "coluna", "pedidos_medios"]]
 
 
 if __name__ == "__main__":
@@ -104,11 +105,11 @@ if __name__ == "__main__":
         for tipo, dias in TIPOS_DE_DIA.items():
             # a conta fecha exatamente (todas as viagens, sem amostra):
             # soma de pedidos_medios = pedidos da grade nos dias do tipo ÷ número de dias
-            soma = lam.loc[lam["dia"] == tipo, "pedidos_medios"].sum()
+            soma = lam.loc[lam["tipo_dia"] == tipo, "pedidos_medios"].sum()
             assert np.isclose(soma, pedidos["dia"].isin(dias).sum() / len(dias), rtol=1e-12, atol=0)
             total = soma * len(dias)
-            por_passo = lam[lam["dia"] == tipo].groupby("passo")["pedidos_medios"].sum()
-            zeros = (lam.loc[lam["dia"] == tipo, "pedidos_medios"] == 0).mean()
+            por_passo = lam[lam["tipo_dia"] == tipo].groupby("passo")["pedidos_medios"].sum()
+            zeros = (lam.loc[lam["tipo_dia"] == tipo, "pedidos_medios"] == 0).mean()
             print(f"λ {tipo:>6} ({len(dias)} dias): {total / len(dias):,.0f} pedidos/dia | "
                   f"por passo (grade toda): mín {por_passo.min():,.0f} às {por_passo.idxmin() * 10 // 60:02d}:"
                   f"{por_passo.idxmin() * 10 % 60:02d}, máx {por_passo.max():,.0f} às "

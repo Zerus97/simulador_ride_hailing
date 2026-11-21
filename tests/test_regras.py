@@ -1,6 +1,6 @@
 """Regras do simulador (seções da proposta), testadas sobre o código atual.
 
-Os exemplos explícitos usam lam=0 (sem demanda aleatória), SemMovimento e
+Os exemplos explícitos usam DemandaPoisson(0) (sem demanda aleatória), SemMovimento e
 pedidos e veículos colocados à mão, para controlar cada passo.
 Ordem dentro de passo(): tempo += 1, demanda, chegadas, expiração, matching,
 reposicionamento.
@@ -11,6 +11,7 @@ from algorithms.algoritmo_reposicionamento import AlgoritmoReposicionamento
 from algorithms.hotspot import Hotspot
 from algorithms.sem_movimento import SemMovimento
 from environment.env import GradeQuadrada, Pedido
+from simulator.demanda import DemandaPoisson
 from simulator.simulator import Simulador
 
 ALGORITMOS = [SemMovimento, Hotspot]
@@ -24,7 +25,7 @@ DESTINO = 24
 
 def simulador_vazio(algoritmo=None):
     """Um veículo, parado em LONGE, sem demanda aleatória."""
-    sim = Simulador(GradeQuadrada(5), num_veiculos=1, lam=0,
+    sim = Simulador(GradeQuadrada(5), num_veiculos=1, demanda=DemandaPoisson(0),
                     algoritmo=algoritmo or SemMovimento(), seed=0)
     sim.veiculos[0].zona = LONGE
     return sim
@@ -145,7 +146,7 @@ class Espiao(AlgoritmoReposicionamento):
 def test_recomendacao_e_zona_atual_ou_vizinha(algoritmo, seed):
     espiao = Espiao(algoritmo())
     grade = GradeQuadrada(5)
-    sim = Simulador(grade, num_veiculos=10, lam=0.4, algoritmo=espiao, seed=seed)
+    sim = Simulador(grade, num_veiculos=10, demanda=DemandaPoisson(0.4), algoritmo=espiao, seed=seed)
 
     sim.rodar(200)
 
@@ -161,7 +162,7 @@ def test_recomendacao_e_zona_atual_ou_vizinha(algoritmo, seed):
 @pytest.mark.parametrize("algoritmo", ALGORITMOS)
 @pytest.mark.parametrize("seed", SEMENTES)
 def test_taxa_de_atendimento_e_atendidos_sobre_total(algoritmo, seed):
-    sim = Simulador(GradeQuadrada(5), num_veiculos=10, lam=0.4, algoritmo=algoritmo(), seed=seed)
+    sim = Simulador(GradeQuadrada(5), num_veiculos=10, demanda=DemandaPoisson(0.4), algoritmo=algoritmo(), seed=seed)
 
     sim.rodar(200)
     m = sim.metrics()

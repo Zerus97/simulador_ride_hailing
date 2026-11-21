@@ -484,7 +484,7 @@ if __name__ == "__main__":
         matriz, nos = matriz_tempos(g)
         f = pd.read_csv(DATASET / "fatores_hora.csv")
         # os diagnósticos comparam com o fator geral (todas as distâncias) dos dias úteis
-        f = f[(f["dia"] == "util") & (f["lado"] == f["lado"].iloc[0])]
+        f = f[(f["tipo_dia"] == "util") & (f["lado"] == f["lado"].iloc[0])]
         fatores = f.set_index("hora")[["fator_geral"]].rename(columns={"fator_geral": "fator"})
         tempos = tempos_viagens(amostra_dias(df, DIAS_VALIDACAO), g, matriz, nos)
         print(f"dias de validação {DIAS_VALIDACAO}: {len(tempos):,} viagens válidas na amostra")
@@ -545,15 +545,15 @@ if __name__ == "__main__":
         for nome, dias in conjuntos.items():
             print(f"{nome:>9} (dias {dias}): {len(tempos[nome]):,} viagens válidas")
 
-        geral = {dia: fatores_por_hora(tempos[dia])["fator"] for dia in ("util", "sabado")}
+        geral = {tipo: fatores_por_hora(tempos[tipo])["fator"] for tipo in ("util", "sabado")}
         linhas = []
         validacao = {}
         a, b = SABADOS_TREINO
         for lado in LADOS:
             faixa = {nome: na_faixa_vizinhas(t, lado) for nome, t in tempos.items()}
-            for dia in ("util", "sabado"):
-                f = fatores_por_hora(faixa[dia]).reset_index()
-                linhas.append(f.assign(lado=lado, dia=dia, fator_geral=f["hora"].map(geral[dia])))
+            for tipo in ("util", "sabado"):
+                f = fatores_por_hora(faixa[tipo]).reset_index()
+                linhas.append(f.assign(lado=lado, tipo_dia=tipo, fator_geral=f["hora"].map(geral[tipo])))
             fat_util = fatores_por_hora(faixa["util"])
             sab = {d: faixa["sabado"][faixa["sabado"]["dia"] == d] for d in SABADOS_TREINO}
             validacao[lado] = {
@@ -562,13 +562,14 @@ if __name__ == "__main__":
                 f"sábado: fatores {b} -> valida {a}": validar(sab[a], fatores_por_hora(sab[b])),
             }
 
-        saida = pd.concat(linhas)[["lado", "dia", "hora", "viagens", "fator", "fator_geral"]]
+        # tipo_dia ("util", "sabado"), e não dia: nas tabelas de viagens, dia é o dia do mês
+        saida = pd.concat(linhas)[["lado", "tipo_dia", "hora", "viagens", "fator", "fator_geral"]]
         saida.to_csv(DATASET / "fatores_hora.csv", index=False)
 
         print(f"\n== Fatores na faixa das vizinhas ({FAIXA_VIZINHAS[0]} a {FAIXA_VIZINHAS[1]} x o lado) ==")
-        for (lado, dia), f in saida.groupby(["lado", "dia"], sort=False):
+        for (lado, tipo), f in saida.groupby(["lado", "tipo_dia"], sort=False):
             menor = f.loc[f["viagens"].idxmin()]
-            print(f"{lado} m, {dia:>6}: {f['viagens'].sum():>9,} viagens | hora com menos: "
+            print(f"{lado} m, {tipo:>6}: {f['viagens'].sum():>9,} viagens | hora com menos: "
                   f"{int(menor['hora']):>2}h com {int(menor['viagens']):,} | fator de {f['fator'].min():.2f} a {f['fator'].max():.2f}")
 
         print(f"\n== Validação na faixa (registrado ÷ calibrado; fora de {FAIXA_VALIDACAO}) ==")
@@ -579,7 +580,7 @@ if __name__ == "__main__":
                                  zip(fora.index, fora["razao"], fora["viagens"])) or "nenhuma"
                 print(f"{lado} m, {nome:<28} de {v['razao'].min():.3f} a {v['razao'].max():.3f} | fora: {desc}")
 
-        u = saida[(saida["lado"] == 1200) & (saida["dia"] == "util")].set_index("hora")
+        u = saida[(saida["lado"] == 1200) & (saida["tipo_dia"] == "util")].set_index("hora")
         print("\n== 1200 m, dias úteis: fator da faixa ÷ fator geral ==")
         print((u["fator"] / u["fator_geral"]).round(3).to_frame("faixa ÷ geral").T.to_string())
         print(f"\nsalvo: fatores_hora.csv ({len(saida)} linhas)")

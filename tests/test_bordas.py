@@ -1,12 +1,13 @@
 import math
 
 from environment.env import GradeQuadrada
+from simulator.demanda import DemandaPoisson
 from simulator.simulator import Simulador
 from algorithms.hotspot import Hotspot
 
 
 def criar_simulador(seed=0, num_veiculos=10, lam=0.4):
-    return Simulador(GradeQuadrada(5), num_veiculos=num_veiculos, lam=lam,
+    return Simulador(GradeQuadrada(5), num_veiculos=num_veiculos, demanda=DemandaPoisson(lam),
                      algoritmo=Hotspot(), seed=seed)
 
 

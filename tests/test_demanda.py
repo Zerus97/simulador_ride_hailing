@@ -83,7 +83,7 @@ def test_lambda_tabela_densa_e_so_dias_do_tipo():
     assert len(lam) == 2 * 144 * 2
     assert lam["pedidos_medios"].notna().all()
     assert (lam["pedidos_medios"] == 0).sum() == len(lam) - 2
-    util = lam.query("dia == 'util' and passo == 5 and linha == 0 and coluna == 0")
-    sabado = lam.query("dia == 'sabado' and passo == 7 and linha == 0 and coluna == 1")
+    util = lam.query("tipo_dia == 'util' and passo == 5 and linha == 0 and coluna == 0")
+    sabado = lam.query("tipo_dia == 'sabado' and passo == 7 and linha == 0 and coluna == 1")
     assert util["pedidos_medios"].tolist() == [1.0]    # dias 1 e 2; o dia 23 não entra
     assert sabado["pedidos_medios"].tolist() == [1.0]

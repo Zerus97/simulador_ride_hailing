@@ -5,14 +5,16 @@ from environment.env import Veiculo, Pedido, Corrida
 class Simulador:
     """Junta a grade e os veiculos, e faz o tempo avancar em passos."""
 
-    def __init__(self, grade, num_veiculos, lam, algoritmo, seed=None): # Como definir o lam de forma que represente melhor a realidade?
+    def __init__(self, grade, num_veiculos, demanda, algoritmo, seed=None):
+        """demanda: a fonte de demanda (ex.: DemandaPoisson), que diz quais pedidos
+        chegam a cada passo; ver simulator/demanda.py."""
         sementes = np.random.SeedSequence(seed).spawn(3)
         self.rng_inicial = np.random.default_rng(sementes[0])
         self.rng_demanda = np.random.default_rng(sementes[1])
         self.rng_aceite  = np.random.default_rng(sementes[2]) 
         self.grade = grade
         self.tempo = 0
-        self.lam = lam
+        self.fonte_demanda = demanda
         self.pedidos = {zona: deque() for zona in self.grade.zonas()}
         self.historico_pedidos = []
         self.corridas_ativas = []
@@ -33,15 +35,17 @@ class Simulador:
         return opcoes[rng.integers(len(opcoes))]
 
     def demanda(self):
-        zonas = self.grade.zonas()
-        for zona in zonas:
-            num_pedidos = int(self.rng_demanda.poisson(self.lam))
-            self.total_pedidos += num_pedidos
-            for k in range(num_pedidos):
-                novo_pedido = Pedido(self.proximo_id_pedido, None, zona, self.escolher([z for z in zonas if z != zona], self.rng_demanda), k + 1, self.tempo)
-                self.pedidos[zona].append(novo_pedido)
-                self.historico_pedidos.append(novo_pedido) # <--- Salva apenas a instância
-                self.proximo_id_pedido += 1
+        """Pergunta à fonte de demanda quais pedidos chegam neste passo e cria os Pedidos.
+        O gerador entregue a ela é o rng_demanda, o mesmo de antes da fonte existir."""
+        for item in self.fonte_demanda.gerar(self.tempo, self.grade, self.rng_demanda):
+            novo_pedido = Pedido(self.proximo_id_pedido, None, item["origem"], item["destino"],
+                                 item.get("custo"), self.tempo,
+                                 segundo_do_dia=item.get("segundo_do_dia"),
+                                 duracao_min=item.get("duracao_min"), km=item.get("km"))
+            self.pedidos[item["origem"]].append(novo_pedido)
+            self.historico_pedidos.append(novo_pedido)
+            self.total_pedidos += 1
+            self.proximo_id_pedido += 1
 
 
     def matching(self):
