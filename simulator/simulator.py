@@ -104,17 +104,41 @@ class Simulador:
                 self._chegadas.append((v.id, v.zona))
 
     def repositioning(self, moves):
-        """Recomendação para outra zona: o carro sai REPOSICIONANDO e chega no passo
-        seguinte (1 passo). Para a própria zona (ou None), é ficar: nada muda.
-        Ainda não há recusa (tarefa 1.9): toda recomendação é executada."""
-        for veiculo in self.veiculos:
-            destino = moves.get(veiculo.id)
-            if destino is not None and destino != veiculo.zona:
-                assert veiculo.estado == OCIOSO, f"recomendação para veículo não ocioso: {veiculo}"
+        """Aplica a saída do algoritmo, {id do veículo: zona}:
+          - zona vizinha: mover; o carro sai REPOSICIONANDO e chega no passo seguinte;
+          - zona atual: ficar (é uma recomendação: na 1.9, o motorista pode recusar);
+          - id ausente: sem recomendação (na 1.9, conduta própria do motorista);
+          - None: não permitido.
+        Tudo é validado antes de aplicar qualquer movimento (ValueError, e não assert:
+        o Python ignora asserts com -O). Ainda não há recusa (tarefa 1.9): toda
+        recomendação, de mover ou de ficar, é aceita e entra em aceites."""
+        self.validar_recomendacoes(moves)
+        for veiculo in self.veiculos:  # ordem de id
+            if veiculo.id not in moves:
+                continue
+            destino = moves[veiculo.id]
+            self._aceites.append(veiculo.id)
+            if destino != veiculo.zona:
                 veiculo.estado = REPOSICIONANDO
                 veiculo.destino = destino
                 veiculo.chegada = self.tempo + 1
-                self._aceites.append(veiculo.id)
+
+    def validar_recomendacoes(self, moves):
+        """Cada (id, destino) precisa ser de um veículo ocioso, para a zona atual dele
+        ou uma vizinha. Vale para qualquer algoritmo, não só para os baselines."""
+        ociosos = {v.id: v.zona for v in self.veiculos if v.estado == OCIOSO}
+        for vid, destino in moves.items():
+            if vid not in ociosos:
+                existe = any(v.id == vid for v in self.veiculos)
+                motivo = "não está ocioso" if existe else "não existe"
+                raise ValueError(f"recomendação para o veículo {vid!r}, que {motivo}")
+            if destino is None:
+                raise ValueError(f"recomendação None para o veículo {vid}: para ficar, devolva a "
+                                 f"zona atual; para não recomendar, omita o veículo")
+            zona = ociosos[vid]
+            if destino != zona and destino not in self.grade.vizinhas(zona):
+                raise ValueError(f"recomendação inválida para o veículo {vid}: {zona} -> {destino!r} "
+                                 f"não é a zona atual nem uma vizinha")
 
     def expire(self):
         for zona, lista in self.pedidos.items():

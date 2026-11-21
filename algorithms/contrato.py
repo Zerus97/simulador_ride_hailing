@@ -23,7 +23,8 @@ class RelatorioDoPasso:
     tempo: int
     casamentos: tuple   # ((id do veículo, id do pedido, zona), ...)
     chegadas: tuple     # ((id do veículo, zona), ...): corridas e reposicionamentos que terminaram
-    aceites: tuple      # ids dos veículos que aceitaram a recomendação (passaram a reposicionar)
+    aceites: tuple      # ids dos veículos que aceitaram a recomendação, de mover ou de ficar
+                        # (os sem recomendação não entram nem aqui nem em recusas)
     recusas: tuple      # ids dos que recusaram (vazio até a 1.9)
 
 

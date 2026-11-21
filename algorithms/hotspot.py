@@ -8,7 +8,7 @@ class Hotspot(AlgoritmoReposicionamento):
             melhor_zona = max(
                 (z for z in obs.grade.vizinhas(zona) if pedidos[z] > 0),
                 key=lambda z: pedidos[z],
-                default=None
+                default=zona  # nenhuma vizinha com pedido: recomenda ficar
             )
             d[vid] = melhor_zona
         return d

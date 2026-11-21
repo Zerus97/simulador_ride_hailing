@@ -203,9 +203,8 @@ def test_recomendacao_e_zona_atual_ou_vizinha(algoritmo, seed):
 
     for vid, zona, destino in espiao.recomendacoes:
         assert zona is not None, f"veículo {vid} recebeu recomendação sem estar ocioso"
-        if destino is not None:  # None = fica onde está
-            assert destino == zona or destino in grade.vizinhas(zona), \
-                f"veículo {vid}: {zona} -> {destino}"
+        assert destino == zona or destino in grade.vizinhas(zona), \
+            f"veículo {vid}: {zona} -> {destino}"
 
 
 # --- §10 Métricas coerentes: taxa de atendimento = atendidos ÷ total ---
@@ -403,3 +402,57 @@ def test_relatorios_nao_perdem_casamentos(seed):
     relatorios = [obs.relatorio for obs in espiao.obs[1:]] + [sim.ultimo_relatorio]
     casamentos = sum(len(r.casamentos) for r in relatorios)
     assert casamentos == len(sim.corridas_ativas) + len(sim.corridas_concluidas)
+
+
+# --- 1.7(c): a saída do algoritmo ---
+
+class Devolve(AlgoritmoReposicionamento):
+    """Devolve sempre a mesma saída."""
+
+    def __init__(self, saida):
+        self.saida = saida
+
+    def decidir(self, obs):
+        return dict(self.saida)
+
+
+@pytest.mark.parametrize("saida", [
+    {1: 12},     # o carro 1 está em corrida
+    {0: 2},      # a zona 2 fica a duas zonas da 0
+    {99: 0},     # não existe veículo 99
+    {0: None},   # None não é recomendação
+], ids=["carro_em_corrida", "duas_zonas", "id_inexistente", "none"])
+def test_recomendacao_invalida_da_erro(saida):
+    with pytest.raises(ValueError):
+        situacao_montada(Devolve(saida))  # carro 0 ocioso na zona 0; carro 1 em corrida
+
+
+def test_ficar_e_sem_recomendacao():
+    sim = Simulador(GradeQuadrada(5), num_veiculos=2, demanda=DemandaPoisson(0),
+                    algoritmo=Devolve({0: 0}), seed=0)
+    sim.veiculos[0].zona, sim.veiculos[1].zona = 0, 24
+    sim.passo()
+
+    assert [(v.estado, v.zona) for v in sim.veiculos] == [(OCIOSO, 0), (OCIOSO, 24)]
+    assert sim.ultimo_relatorio.aceites == (0,)  # o 1 ficou sem recomendação
+
+
+class GuardaSaida(AlgoritmoReposicionamento):
+    def __init__(self, algoritmo):
+        self.algoritmo = algoritmo
+        self.pares = []
+
+    def decidir(self, obs):
+        saida = self.algoritmo.decidir(obs)
+        self.pares.append((obs, saida))
+        return saida
+
+
+@pytest.mark.parametrize("seed", [0, 1, 2])
+def test_hotspot_recomenda_para_todos_os_ociosos(seed):
+    espiao = GuardaSaida(Hotspot())
+    sim = Simulador(GradeQuadrada(5), num_veiculos=10, demanda=DemandaPoisson(0.4),
+                    algoritmo=espiao, seed=seed)
+    sim.rodar(200)
+    for obs, saida in espiao.pares:
+        assert set(saida) == {vid for vid, _ in obs.ociosos}, obs.tempo
