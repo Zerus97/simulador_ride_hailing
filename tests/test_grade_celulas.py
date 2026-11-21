@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from environment.env import GradeCelulas, GradeQuadrada, grade_do_csv
+from environment.env import GradeCelulas, GradeQuadrada, grade_do_csv, nao_vizinhos_do_csv
 
 DATASET = Path(__file__).resolve().parent.parent / "dataset"
 
@@ -95,3 +95,20 @@ def test_manhattan_e_conexa(lado, n_zonas):
     g = grade_do_csv(caminho)
     assert len(g.zonas()) == n_zonas
     assert g.conexo()
+
+
+# O tabuleiro que o simulador usa: a grade sem os pares acima de 15 min (1.3d).
+# Se um par citar uma célula que não existe ou não é adjacente, a GradeCelulas levanta
+# ValueError: o teste também garante que o nao_vizinhos está de acordo com a grade.
+@pytest.mark.parametrize("lado, n_zonas, n_excluidos", [(1200, 58, 11), (600, 178, 2)])
+def test_tabuleiro_de_manhattan(lado, n_zonas, n_excluidos):
+    grade = DATASET / f"grade_{lado}.csv"
+    pares = DATASET / f"nao_vizinhos_{lado}.csv"
+    if not (grade.exists() and pares.exists()):
+        pytest.skip("dataset fora do repositório")
+    nao = nao_vizinhos_do_csv(pares)
+    g = grade_do_csv(grade, nao_vizinhos=nao)
+    assert len(g.zonas()) == n_zonas
+    assert len(nao) == n_excluidos
+    assert g.conexo()
+    assert all(g.vizinhas(z) for z in g.zonas()), "zona sem vizinha"

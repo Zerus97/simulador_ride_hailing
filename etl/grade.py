@@ -16,7 +16,6 @@ from etl.etl import DATASET, DIAS_TREINO, SAIDA
 from etl.zonas import CRS_GRADE, origem_grade
 
 LADOS = [1200, 600]  # lado da célula, em metros
-POUCAS_VIAGENS = 10  # limite para listar as células quase vazias
 
 # Mínimo de pontas (embarques + desembarques) nos dias de treino para a célula existir.
 # Na grade de 1,2 km, as contagens saltam de 16 para 81; com menos de 20 pontos,
@@ -130,13 +129,7 @@ if __name__ == "__main__":
         grade.to_csv(csv, index=False)
         desenhar(grade, lado, png)
 
-        pontas = grade["embarques"] + grade["desembarques"]
-        poucas = grade[pontas < POUCAS_VIAGENS]
         linhas, colunas = grade["linha"].max() + 1, grade["coluna"].max() + 1
         print(f"\n== lado {lado} m ==")
         print(f"células ocupadas: {len(grade)} (de {linhas} x {colunas} = {linhas * colunas} no retângulo)")
-        print(f"com menos de {POUCAS_VIAGENS} viagens (embarques + desembarques): {len(poucas)}")
-        if len(poucas):
-            print(poucas[["linha", "coluna", "embarques", "desembarques",
-                          "lat_centro", "lon_centro"]].to_string(index=False))
         print(f"salvo: {csv.name}, {png.name}")

@@ -193,6 +193,8 @@ def imprimir_relatorio(relatorio):
 
 
 DIAS_TREINO = [1, 2, 3, 7, 8, 9, 10]
+SABADOS_TREINO = [5, 12]        # o cenário de fim de semana é o sábado 19/mar
+DIAS_VALIDACAO = [14, 15, 16]   # seg–qua: nem treino, nem avaliação, nem excluídos
 KM_POR_MILHA = 1.609
 
 

@@ -1,7 +1,9 @@
 import networkx as nx
+import pandas as pd
 import pytest
 
-from etl.osm import adicionar_velocidades
+from etl.grade import para_latlon
+from etl.osm import adicionar_velocidades, pontos_mediana
 
 
 def test_velocidade_pelo_tipo_ignora_maxspeed():
@@ -17,3 +19,44 @@ def test_velocidade_pelo_tipo_ignora_maxspeed():
     expressa, rua = g[1][2][0], g[2][1][0]
     assert expressa["speed_kph"] == 64.4 and expressa["travel_time"] == pytest.approx(55.90, abs=0.01)
     assert rua["speed_kph"] == 40.2 and rua["travel_time"] == pytest.approx(89.55, abs=0.01)
+
+
+# --- pontos_mediana ---
+# Células de 1000 m com origem em (583000, 4506000), em metros (UTM 18N):
+#   (0, 0): x de 583000 a 584000 | (0, 1): x de 584000 a 585000 | (1, 0): sem viagens
+ORIGEM = (583_000, 4_506_000)
+LADO = 1000
+
+
+def viagens_de_mentira(embarques, desembarques):
+    """DataFrame de viagens a partir de pontos conhecidos em metros."""
+    (xe, ye), (xd, yd) = zip(*embarques), zip(*desembarques)
+    lon_e, lat_e = para_latlon.transform(list(xe), list(ye))
+    lon_d, lat_d = para_latlon.transform(list(xd), list(yd))
+    return pd.DataFrame({"pickup_longitude": lon_e, "pickup_latitude": lat_e,
+                         "dropoff_longitude": lon_d, "dropoff_latitude": lat_d})
+
+
+# três viagens: embarques em (0, 0), desembarques em (0, 1)
+VIAGENS = viagens_de_mentira(
+    embarques=[(583_100, 4_506_100), (583_300, 4_506_300), (583_900, 4_506_200)],
+    desembarques=[(584_500, 4_506_500), (584_700, 4_506_900), (584_600, 4_506_700)],
+)
+
+
+def test_pontos_mediana_da_o_valor_calculado_a_mao():
+    # a grade em ordem diferente da contagem: o resultado segue a ordem da grade
+    grade = pd.DataFrame({"linha": [0, 0], "coluna": [1, 0]})
+
+    x, y = pontos_mediana(VIAGENS, grade, LADO, ORIGEM)
+
+    # (0, 1): x = mediana(584500, 584700, 584600) = 584600; y = mediana(4506500, 4506900, 4506700)
+    # (0, 0): x = mediana(583100, 583300, 583900) = 583300; y = mediana(4506100, 4506300, 4506200)
+    assert x == pytest.approx([584_600, 583_300], abs=1e-3)
+    assert y == pytest.approx([4_506_700, 4_506_200], abs=1e-3)
+
+
+def test_pontos_mediana_celula_sem_viagens_da_erro():
+    grade = pd.DataFrame({"linha": [0, 0, 1], "coluna": [0, 1, 0]})
+    with pytest.raises(KeyError, match=r"\(1, 0\)"):
+        pontos_mediana(VIAGENS, grade, LADO, ORIGEM)

@@ -77,6 +77,14 @@ def grade_do_csv(caminho, nao_vizinhos=()):
     return GradeCelulas(celulas, nao_vizinhos)
 
 
+def nao_vizinhos_do_csv(caminho):
+    """Pares de células ((linha, coluna), (linha, coluna)) de um CSV de pares excluídos
+    (ex.: dataset/nao_vizinhos_1200.csv, com as colunas linha_a, coluna_a, linha_b, coluna_b)."""
+    with open(caminho, newline="") as f:
+        return [((int(r["linha_a"]), int(r["coluna_a"])), (int(r["linha_b"]), int(r["coluna_b"])))
+                for r in csv.DictReader(f)]
+
+
 class Veiculo:
     """Um veiculo que fica numa zona e pode estar ocioso ou ocupado."""
 
