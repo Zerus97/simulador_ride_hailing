@@ -1,11 +1,13 @@
 """1.12(a): o coletor das métricas da proposta (simulator/metricas.py)."""
 import math
+import time
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import pytest
 
+from algorithms.algoritmo_reposicionamento import AlgoritmoReposicionamento
 from algorithms.hotspot import Hotspot
 from algorithms.sem_movimento import SemMovimento
 from algorithms.sem_recomendacao import SemRecomendacao
@@ -123,3 +125,79 @@ def test_dia_23_atendimento_e_receita():
     assert m["pedidos_atendidos"] == len(atendidas)
     assert m["receita_usd"] == pytest.approx(3.25 * sum(c.pedido.km for c in atendidas))
     assert 0 < m["espera_media_min"] <= 20
+
+
+# --- 1.12(b): as secundárias ---
+
+def test_aceite_com_rho_0_3():
+    sim = Simulador(GradeQuadrada(5), num_veiculos=500, demanda=DemandaPoisson(0.2), algoritmo=FicarTodos(),
+                    seed=0, comportamento=Comportamento(AceiteFixo(0.3), Ficar()), passos_aquecimento=0)
+    sim.rodar(20)
+    c = sim.coletor
+    n = c.aceites + c.recusas
+    assert n > 5000
+    assert abs(sim.metricas()["aceite"] - 0.3) < 4 * np.sqrt(0.3 * 0.7 / n)
+
+
+def sucesso_de_um_movimento(pedido_em=None, passos=3):
+    """O carro 0 é mandado de LONGE (0) para a vizinha 6 no passo 1 e chega no 2.
+    pedido_em: passo em que aparece um pedido na zona 6 (None = nenhum)."""
+    sim = Simulador(GradeQuadrada(5), num_veiculos=1, demanda=DemandaPoisson(0), algoritmo=MoveUmaVez(6),
+                    seed=0, passos_aquecimento=0)
+    sim.veiculos[0].zona = LONGE
+    for t in range(1, passos + 1):
+        if t == pedido_em:
+            pedido_no_proximo_passo(sim, zona=6, destino=6)
+        sim.passo()
+    m = sim.metricas()
+    return m["reposicionamentos_avaliados"], m["reposicionamento_sucesso"]
+
+
+def test_sucesso_com_pedido_esperando_na_chegada():
+    assert sucesso_de_um_movimento(pedido_em=1) == (1, 1.0)  # pedido desde o passo 1, carro chega no 2
+
+
+def test_fracasso_em_zona_vazia():
+    assert sucesso_de_um_movimento(pedido_em=None) == (1, 0.0)
+
+
+def test_pedido_depois_da_chegada_e_fracasso():
+    # a janela é fixa: só o matching de t + 1 conta
+    assert sucesso_de_um_movimento(pedido_em=3) == (1, 0.0)
+
+
+def test_movimento_do_ultimo_passo_fica_fora():
+    avaliados, sucesso = sucesso_de_um_movimento(passos=1)
+    assert avaliados == 0 and math.isnan(sucesso)
+
+
+def test_ganhos_do_motorista():
+    # carro 1 faz uma corrida de 2 km (3,25 × 2 = 6,50); carro 0 se move 1,5 km (0,23 × 1,5 = 0,345)
+    tempos = TemposEntreZonas({(LONGE, 6): 2.0}, {(LONGE, 6): 1.5}, {h: 3.0 for h in range(24)})
+    sim = Simulador(GradeQuadrada(5), num_veiculos=2, demanda=DemandaPoisson(0), algoritmo=MoveUmaVez(6),
+                    seed=0, tempos=tempos, passos_aquecimento=0)
+    sim.veiculos[0].zona, sim.veiculos[1].zona = LONGE, ZONA
+    pedido_no_proximo_passo(sim, zona=ZONA, destino=ZONA, km=2.0, segundo_do_dia=0)
+    sim.rodar(2)
+    assert sim.metricas()["ganhos_usd_por_veiculo"] == pytest.approx((6.50 - 0.345) / 2)
+
+
+def test_ociosidade_soma_1():
+    sim = Simulador(GradeQuadrada(5), num_veiculos=10, demanda=DemandaPoisson(0.4), algoritmo=Hotspot(), seed=0)
+    sim.rodar(100)
+    m = sim.metricas()
+    assert m["frac_reposicionando"] > 0 and m["frac_em_corrida"] > 0
+    assert m["frac_parado"] + m["frac_reposicionando"] + m["frac_em_corrida"] == pytest.approx(1)
+
+
+def test_tempo_de_decisao():
+    class Lento(AlgoritmoReposicionamento):
+        def decidir(self, obs):
+            time.sleep(0.01)
+            return {}
+
+    sim = Simulador(GradeQuadrada(5), num_veiculos=2, demanda=DemandaPoisson(0), algoritmo=Lento(),
+                    seed=0, passos_aquecimento=0)
+    sim.rodar(3)
+    m = sim.metricas()
+    assert m["decisao_media_s"] >= 0.01 and m["decisao_max_s"] >= m["decisao_media_s"]

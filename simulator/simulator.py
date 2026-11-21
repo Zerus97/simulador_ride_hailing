@@ -1,3 +1,4 @@
+import time
 from collections import Counter, deque
 import numpy as np
 from algorithms.contrato import Observacao, RelatorioDoPasso
@@ -221,7 +222,10 @@ class Simulador:
         self.arrivals()
         self.expire()
         self.matching()
-        repositioning = self.algoritmo.decidir(self.observar())  # leva o relatório de t - 1
+        obs = self.observar()  # leva o relatório de t - 1
+        inicio = time.perf_counter()
+        repositioning = self.algoritmo.decidir(obs)
+        tempo_decisao = time.perf_counter() - inicio
         self.repositioning(repositioning)
         self.ociosidade()
         self.ultimo_relatorio = RelatorioDoPasso(
@@ -235,7 +239,9 @@ class Simulador:
         novos = self.historico_pedidos[self._registrados:]
         self._registrados = len(self.historico_pedidos)
         self.coletor.registrar(self.ultimo_relatorio, self.fonte_demanda.passo_do_dia(self.tempo) // 6,
-                               novos, self._corridas_novas)
+                               novos, self._corridas_novas,
+                               estados=Counter(v.estado for v in self.veiculos),
+                               tempo_decisao=tempo_decisao)
 
     def ociosidade(self):
         """Soma os carros sem passageiro: os OCIOSOS e os REPOSICIONANDO, como antes dos
