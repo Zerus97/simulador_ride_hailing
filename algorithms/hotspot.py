@@ -1,13 +1,14 @@
 from algorithms.algoritmo_reposicionamento import AlgoritmoReposicionamento
     
 class Hotspot(AlgoritmoReposicionamento):
-    def decidir(self, veiculos_ociosos, corridas_ativas, pedidos, grade):
+    def decidir(self, obs):
+        pedidos = obs.pedidos_abertos
         d = dict()
-        for v in veiculos_ociosos:
+        for vid, zona in obs.ociosos:
             melhor_zona = max(
-                (z for z in grade.vizinhas(v[1]) if pedidos[z] > 0),
+                (z for z in obs.grade.vizinhas(zona) if pedidos[z] > 0),
                 key=lambda z: pedidos[z],
                 default=None
             )
-            d[v[0]] = melhor_zona
+            d[vid] = melhor_zona
         return d

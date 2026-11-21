@@ -5,6 +5,9 @@ pedidos e veículos colocados à mão, para controlar cada passo.
 Ordem dentro de passo(): tempo += 1, demanda, chegadas, expiração, matching,
 reposicionamento.
 """
+import dataclasses
+from collections import Counter
+
 import numpy as np
 import pytest
 
@@ -106,7 +109,7 @@ class MoveUmaVez(AlgoritmoReposicionamento):
         self.destino = destino
         self.ja_moveu = False
 
-    def decidir(self, veiculos_ociosos, corridas_ativas, pedidos, grade):
+    def decidir(self, obs):
         if self.ja_moveu:
             return {}
         self.ja_moveu = True
@@ -181,9 +184,9 @@ class Espiao(AlgoritmoReposicionamento):
         self.algoritmo = algoritmo
         self.recomendacoes = []
 
-    def decidir(self, veiculos_ociosos, corridas_ativas, pedidos, grade):
-        moves = self.algoritmo.decidir(veiculos_ociosos, corridas_ativas, pedidos, grade)
-        zona_atual = dict(veiculos_ociosos)
+    def decidir(self, obs):
+        moves = self.algoritmo.decidir(obs)
+        zona_atual = dict(obs.ociosos)
         for vid, destino in moves.items():
             self.recomendacoes.append((vid, zona_atual.get(vid), destino))
         return moves
@@ -292,3 +295,111 @@ def test_gerador_do_matching_nao_muda_os_pedidos():
     assert historico(normal) == historico(trocado)
     # e a troca teve efeito: outros motoristas atenderam
     assert pares_pedido_veiculo(normal) != pares_pedido_veiculo(trocado)
+
+
+# --- 1.7(a): a observação que o algoritmo recebe ---
+
+class GuardaObservacao(AlgoritmoReposicionamento):
+    """Guarda cada Observacao recebida e repassa a decisão a `algoritmo` (se houver);
+    opcionalmente esvazia os pedidos abertos dela."""
+
+    def __init__(self, esvaziar=False, algoritmo=None):
+        self.obs = []
+        self.esvaziar = esvaziar
+        self.algoritmo = algoritmo
+
+    def decidir(self, obs):
+        self.obs.append(obs)
+        if self.esvaziar:
+            obs.pedidos_abertos.clear()
+        return self.algoritmo.decidir(obs) if self.algoritmo else {}
+
+
+def situacao_montada(algoritmo):
+    """Passo 1, à mão: o carro 0 ocioso na zona 0; o carro 1 pega um pedido de 25 min
+    (2 passos) na zona 12 para a 24; dois pedidos esperam na zona 18, sem carro."""
+    sim = Simulador(GradeQuadrada(5), num_veiculos=2, demanda=DemandaPoisson(0),
+                    algoritmo=algoritmo, seed=0)
+    sim.veiculos[0].zona, sim.veiculos[1].zona = 0, 12
+    pedido_no_proximo_passo(sim, zona=12, destino=24, duracao_min=25)
+    pedido_no_proximo_passo(sim, zona=18, destino=0)
+    pedido_no_proximo_passo(sim, zona=18, destino=1)
+    sim.passo()
+    return sim
+
+
+def test_observacao_mostra_o_estado_certo():
+    espiao = GuardaObservacao()
+    sim = situacao_montada(espiao)
+
+    (obs,) = espiao.obs
+    assert obs.tempo == 1
+    assert obs.ociosos == ((0, 0),)
+    assert obs.pedidos_abertos == {z: (2 if z == 18 else 0) for z in range(25)}
+    assert obs.chegadas == Counter({(24, 3): 1})  # o carro 1 chega à zona 24 em t + 2
+    assert obs.grade is sim.grade
+
+
+def test_algoritmo_nao_mexe_no_simulador_pela_observacao():
+    espiao = GuardaObservacao(esvaziar=True)
+    sim = situacao_montada(espiao)
+
+    assert len(sim.pedidos[18]) == 2  # o algoritmo esvaziou a cópia, não a fila
+    (obs,) = espiao.obs
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        obs.ociosos = ()
+
+
+# --- 1.7(b): o relatório do passo ---
+
+def test_relatorio_chega_no_passo_seguinte():
+    espiao = GuardaObservacao(algoritmo=Hotspot())
+    sim = Simulador(GradeQuadrada(5), num_veiculos=10, demanda=DemandaPoisson(0.4),
+                    algoritmo=espiao, seed=0)
+    sim.rodar(50)
+
+    assert espiao.obs[0].relatorio is None
+    assert all(obs.relatorio.tempo == obs.tempo - 1 for obs in espiao.obs[1:])
+    assert sim.ultimo_relatorio.tempo == 50  # o do último passo nunca chega ao algoritmo
+
+
+def test_relatorio_casamento_e_chegada_da_corrida():
+    # carro 0 ocioso na ZONA e um pedido de 25 min (2 passos) na mesma zona
+    sim = simulador_vazio()
+    sim.veiculos[0].zona = ZONA
+    pedido = pedido_no_proximo_passo(sim, duracao_min=25)
+    t = pedido.criado_em
+
+    sim.passo()
+    assert sim.ultimo_relatorio.tempo == t
+    assert sim.ultimo_relatorio.casamentos == ((0, pedido.id, ZONA),)
+    assert sim.ultimo_relatorio.chegadas == ()
+
+    sim.passo()
+    assert sim.ultimo_relatorio.chegadas == ()        # ainda em corrida em t + 1
+    sim.passo()
+    assert sim.ultimo_relatorio.chegadas == ((0, DESTINO),)   # termina em t + 2
+
+
+def test_relatorio_aceite_e_chegada_do_reposicionamento():
+    vizinha = 6  # vizinha de LONGE (0)
+    sim = simulador_vazio(MoveUmaVez(vizinha))
+
+    sim.passo()
+    assert sim.ultimo_relatorio.aceites == (0,)
+    assert sim.ultimo_relatorio.recusas == ()
+    sim.passo()
+    assert sim.ultimo_relatorio.chegadas == ((0, vizinha),)
+    assert sim.ultimo_relatorio.aceites == ()
+
+
+@pytest.mark.parametrize("seed", [0, 1, 2, 3, 4])
+def test_relatorios_nao_perdem_casamentos(seed):
+    espiao = GuardaObservacao(algoritmo=Hotspot())
+    sim = Simulador(GradeQuadrada(5), num_veiculos=10, demanda=DemandaPoisson(0.4),
+                    algoritmo=espiao, seed=seed)
+    sim.rodar(200)
+
+    relatorios = [obs.relatorio for obs in espiao.obs[1:]] + [sim.ultimo_relatorio]
+    casamentos = sum(len(r.casamentos) for r in relatorios)
+    assert casamentos == len(sim.corridas_ativas) + len(sim.corridas_concluidas)

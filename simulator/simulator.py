@@ -1,5 +1,6 @@
 from collections import Counter, deque
 import numpy as np
+from algorithms.contrato import Observacao, RelatorioDoPasso
 from environment.env import EM_CORRIDA, OCIOSO, REPOSICIONANDO, Corrida, Pedido, Veiculo
 
 class Simulador:
@@ -24,6 +25,9 @@ class Simulador:
         self.corridas_concluidas = []
         self.algoritmo = algoritmo
         self.proximo_id_pedido = 1
+        # relatório do passo: o que aconteceu, registrado durante o passo
+        self.ultimo_relatorio = None   # o do último passo completo (o do passo final nunca chega ao algoritmo)
+        self._casamentos, self._chegadas, self._aceites = [], [], []
         # espalha os veiculos em zonas aleatorias da grade
         zonas = grade.zonas()
         self.ociosidades = 0
@@ -78,6 +82,7 @@ class Simulador:
                 v.estado = EM_CORRIDA
                 pedido = fila.popleft()
                 self.corridas_ativas.append(Corrida(v, pedido, self.tempo))
+                self._casamentos.append((v.id, pedido.id, zona))
     
     def arrivals(self):
         """Libera as corridas que chegam neste passo e os carros que terminam de se
@@ -88,6 +93,7 @@ class Simulador:
                 corrida.veiculo.zona = corrida.pedido.destino
                 corrida.veiculo.estado = OCIOSO
                 self.corridas_concluidas.append(corrida)
+                self._chegadas.append((corrida.veiculo.id, corrida.veiculo.zona))
             else:
                 restantes.append(corrida)
         self.corridas_ativas = restantes
@@ -95,6 +101,7 @@ class Simulador:
         for v in self.veiculos:
             if v.estado == REPOSICIONANDO and v.chegada == self.tempo:
                 v.zona, v.estado, v.destino, v.chegada = v.destino, OCIOSO, None, None
+                self._chegadas.append((v.id, v.zona))
 
     def repositioning(self, moves):
         """Recomendação para outra zona: o carro sai REPOSICIONANDO e chega no passo
@@ -107,6 +114,7 @@ class Simulador:
                 veiculo.estado = REPOSICIONANDO
                 veiculo.destino = destino
                 veiculo.chegada = self.tempo + 1
+                self._aceites.append(veiculo.id)
 
     def expire(self):
         for zona, lista in self.pedidos.items():
@@ -120,16 +128,21 @@ class Simulador:
 
     def passo(self):
         self.tempo += 1
+        self._casamentos, self._chegadas, self._aceites = [], [], []
         self.demanda()
         self.arrivals()
         self.expire()
         self.matching()
-        repositioning = self.algoritmo.decidir(self.listar_veiculos(ociosos=True),
-                               self.contar_veiculos_por_zona_futura(ociosos=False), 
-                               self.contar_pedidos_por_zona(),
-                               self.grade)
+        repositioning = self.algoritmo.decidir(self.observar())  # leva o relatório de t - 1
         self.repositioning(repositioning)
         self.ociosidade()
+        self.ultimo_relatorio = RelatorioDoPasso(
+            tempo=self.tempo,
+            casamentos=tuple(self._casamentos),
+            chegadas=tuple(self._chegadas),
+            aceites=tuple(self._aceites),
+            recusas=(),  # ainda não há recusa (tarefa 1.9)
+        )
 
     def ociosidade(self):
         """Soma os carros sem passageiro: os OCIOSOS e os REPOSICIONANDO, como antes dos
@@ -168,11 +181,20 @@ class Simulador:
     def pedidos_abertos(self):
         return [pedido for lista in self.pedidos.values() for pedido in lista]
 
-    def contar_veiculos_por_zona_futura(self, ociosos=True):
-        contagem = Counter()
+    def observar(self):
+        """A Observacao que o algoritmo recebe neste passo (depois do matching).
+        Tudo é montado de novo a cada passo: o algoritmo não alcança o estado do simulador."""
+        chegadas = Counter()
         for corrida in self.corridas_ativas:
-            contagem[corrida.pedido.destino] += 1
-        return contagem
+            chegadas[(corrida.pedido.destino, corrida.horario_chegada)] += 1
+        return Observacao(
+            tempo=self.tempo,
+            ociosos=tuple(self.listar_veiculos(ociosos=True)),
+            pedidos_abertos=self.contar_pedidos_por_zona(),
+            chegadas=chegadas,
+            grade=self.grade,
+            relatorio=self.ultimo_relatorio,
+        )
 
     def listar_veiculos(self, ociosos=True):
         return [
