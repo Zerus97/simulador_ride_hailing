@@ -1,6 +1,7 @@
 from collections import Counter, deque
 import numpy as np
 from algorithms.contrato import Observacao, RelatorioDoPasso
+from simulator.metricas import ColetorMetricas
 from environment.comportamento import AceiteFixo, Comportamento, Contexto, Ficar
 from environment.env import EM_CORRIDA, OCIOSO, REPOSICIONANDO, Corrida, Pedido, Veiculo
 from environment.tempo import PASSOS_POR_DIA
@@ -9,14 +10,16 @@ class Simulador:
     """Junta a grade e os veiculos, e faz o tempo avancar em passos."""
 
     def __init__(self, grade, num_veiculos, demanda, algoritmo, seed=None, previsao=None, tempos=None,
-                 preferencias=None, comportamento=None):
+                 preferencias=None, comportamento=None, passos_aquecimento=6):
         """demanda: a fonte de demanda (ex.: DemandaPoisson), que diz quais pedidos
         chegam a cada passo e define o calendário (passo_do_dia); ver simulator/demanda.py.
         previsao e tempos: só repassados aos algoritmos, na observação
         (environment/previsao.py e environment/tempos.py).
         preferencias: environment/preferencias.py; a observação leva a de cada ocioso.
         comportamento: como o motorista responde à recomendação (environment/comportamento.py);
-        o padrão, aceite de 100% e ficar sem recomendação, é o simulador de antes da 1.9."""
+        o padrão, aceite de 100% e ficar sem recomendação, é o simulador de antes da 1.9.
+        passos_aquecimento: os primeiros passos que ficam fora das métricas da proposta
+        (sim.metricas(); simulator/metricas.py). O metrics() antigo não muda."""
         # O modo sequencial (um motorista por vez, i-Rebalance original) só existe na
         # tarefa 4.6: melhor falhar na construção do que no meio da simulação.
         if getattr(algoritmo, "sequencial", False):
@@ -49,6 +52,8 @@ class Simulador:
         self.fonte_demanda = demanda
         self.pedidos = {zona: deque() for zona in self.grade.zonas()}
         self.historico_pedidos = []
+        self.coletor = ColetorMetricas(passos_aquecimento, tempos=tempos)
+        self._registrados = 0  # pedidos do histórico já entregues ao coletor
         self.corridas_ativas = []
         self.corridas_concluidas = []
         self.algoritmo = algoritmo
@@ -56,6 +61,7 @@ class Simulador:
         # relatório do passo: o que aconteceu, registrado durante o passo
         self.ultimo_relatorio = None   # o do último passo completo (o do passo final nunca chega ao algoritmo)
         self._casamentos, self._chegadas, self._aceites, self._recusas = [], [], [], []
+        self._movimentos, self._corridas_novas = [], []
         self.ociosidades = 0
         self.total_pedidos = 0
         self.pedidos_expirados = 0
@@ -125,6 +131,7 @@ class Simulador:
                 v.estado = EM_CORRIDA
                 pedido = fila.popleft()
                 self.corridas_ativas.append(Corrida(v, pedido, self.tempo))
+                self._corridas_novas.append(self.corridas_ativas[-1])
                 self._casamentos.append((v.id, pedido.id, zona))
     
     def arrivals(self):
@@ -173,6 +180,8 @@ class Simulador:
             elif aceitou is False:
                 self._recusas.append(veiculo.id)
             if destino != veiculo.zona:
+                tipo = {True: "recomendado", False: "pos_recusa", None: "proprio"}[aceitou]
+                self._movimentos.append((veiculo.id, veiculo.zona, destino, tipo))
                 veiculo.estado = REPOSICIONANDO
                 veiculo.destino = destino
                 veiculo.chegada = self.tempo + 1
@@ -207,6 +216,7 @@ class Simulador:
     def passo(self):
         self.tempo += 1
         self._casamentos, self._chegadas, self._aceites, self._recusas = [], [], [], []
+        self._movimentos, self._corridas_novas = [], []
         self.demanda()
         self.arrivals()
         self.expire()
@@ -220,7 +230,12 @@ class Simulador:
             chegadas=tuple(self._chegadas),
             aceites=tuple(self._aceites),
             recusas=tuple(self._recusas),
+            movimentos=tuple(self._movimentos),
         )
+        novos = self.historico_pedidos[self._registrados:]
+        self._registrados = len(self.historico_pedidos)
+        self.coletor.registrar(self.ultimo_relatorio, self.fonte_demanda.passo_do_dia(self.tempo) // 6,
+                               novos, self._corridas_novas)
 
     def ociosidade(self):
         """Soma os carros sem passageiro: os OCIOSOS e os REPOSICIONANDO, como antes dos
@@ -238,6 +253,10 @@ class Simulador:
             return float("nan")
         else:
             return numerator / denominator
+
+    def metricas(self):
+        """As métricas da proposta (Tab. 3.4), sem o aquecimento: simulator/metricas.py."""
+        return self.coletor.resultado()
 
     def metrics(self):
         taxa_atendimento = self.taxa(len(self.corridas_ativas) + len(self.corridas_concluidas), (self.total_pedidos))

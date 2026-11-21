@@ -41,10 +41,10 @@ def simulador_vazio(algoritmo=None):
     return sim
 
 
-def pedido_no_proximo_passo(sim, zona=ZONA, destino=DESTINO, duracao_min=None, segundo_do_dia=None):
+def pedido_no_proximo_passo(sim, zona=ZONA, destino=DESTINO, duracao_min=None, segundo_do_dia=None, km=None):
     """Cria um pedido como se a demanda o gerasse no próximo passo (t = tempo + 1)."""
     pedido = Pedido(sim.proximo_id_pedido, None, zona, destino, 1, sim.tempo + 1,
-                    segundo_do_dia=segundo_do_dia, duracao_min=duracao_min)
+                    segundo_do_dia=segundo_do_dia, duracao_min=duracao_min, km=km)
     sim.proximo_id_pedido += 1
     sim.total_pedidos += 1
     sim.pedidos[zona].append(pedido)

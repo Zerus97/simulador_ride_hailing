@@ -28,6 +28,9 @@ class RelatorioDoPasso:
     aceites: tuple      # ids dos veículos que aceitaram a recomendação, de mover ou de ficar
                         # (os sem recomendação não entram nem aqui nem em recusas)
     recusas: tuple      # ids dos que recusaram (environment/comportamento.py)
+    movimentos: tuple = ()  # ((id, origem, destino, tipo), ...) de todo carro que saiu da zona;
+                            # tipo: "recomendado" (aceitou e se moveu), "pos_recusa" (recusou e a
+                            # regra o moveu) ou "proprio" (sem recomendação, pelas preferências)
 
 
 @dataclass(frozen=True)
