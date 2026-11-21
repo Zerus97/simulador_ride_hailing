@@ -9,8 +9,13 @@ candidata c (a própria z ou uma vizinha) é proporcional a
     a correção de meio pedido nos dias de treino evita preferência zero onde não houve
     pedido (1 pedido em n dias já fica na frente de nenhum);
   - d(c, b) = distância em km entre os centros das células;
-  - α equilibra os dois termos: média do desvio-padrão de log D entre as candidatas ÷
-    média do desvio-padrão de d(·, base) entre as candidatas (bases pesadas pela demanda).
+  - α equilibra os dois termos, cada um ponderado por onde os motoristas estão:
+    média do desvio-padrão de log D entre as candidatas, com cada (zona atual, hora)
+    pesada pela demanda daquela hora ÷ média do desvio-padrão de d(·, base) entre as
+    candidatas, com cada (zona atual, base) pesada por demanda da zona × demanda da base.
+    Sem a ponderação, as zonas de borda (muitos zeros, pouca demanda) dominavam o
+    numerador e inflavam o α (1,81 contra 1,47 na grade de 1,2 km, dias úteis).
+    O α é o que sai da conta, sem ajuste pelo comportamento que ele produz.
 
 Não há sorteio aqui: dados a base, a zona atual e a hora, o resultado é sempre o mesmo.
 Quem sorteia pelas preferências é o módulo de comportamento (tarefa 1.9).
@@ -32,12 +37,14 @@ CORRECAO_PEDIDOS = 0.5  # meio pedido no total dos dias de treino
 class Preferencias:
     """Preferência de cada motorista entre a zona atual e as vizinhas, por hora."""
 
-    def __init__(self, grade, lado, demanda_hora, pesos_base, peso_demanda=1.0):
-        """demanda_hora: (zona, hora) -> D (já com a correção de 0,5 / n_dias).
+    def __init__(self, grade, lado, lam_hora, demanda_hora, pesos_base, peso_demanda=1.0):
+        """lam_hora: (zona, hora) -> λ da hora, sem correção (os pesos do numerador do α).
+        demanda_hora: (zona, hora) -> D (já com a correção de 0,5 / n_dias).
         pesos_base: zona -> probabilidade de ser sorteada como base (a demanda do dia).
         peso_demanda: 1,0 no modelo; 0,0 é a variação sem demanda (só a distância)."""
         self.grade = grade
         self.lado = lado
+        self.lam_hora = dict(lam_hora)
         self.demanda_hora = dict(demanda_hora)
         self.pesos_base = dict(pesos_base)
         self.peso_demanda = peso_demanda
@@ -54,14 +61,24 @@ class Preferencias:
 
     def _calcular_alfa(self):
         zonas = self.grade.zonas()
-        numerador = fmean(
-            pstdev([math.log(self.demanda_hora[(c, h)]) for c in self.candidatas(z)])
-            for z in zonas for h in range(HORAS_POR_DIA))
-        # para cada zona atual, a média ponderada pelas bases; depois, a média das zonas
-        denominador = fmean(
-            sum(w * pstdev([self.distancia(c, b) for c in self.candidatas(z)])
-                for b, w in self.pesos_base.items() if w > 0)
-            for z in zonas)
+        # numerador: cada (zona atual, hora) pesa a demanda daquela hora
+        termos, pesos = [], []
+        for z in zonas:
+            for h in range(HORAS_POR_DIA):
+                if self.lam_hora[(z, h)] > 0:
+                    termos.append(pstdev([math.log(self.demanda_hora[(c, h)]) for c in self.candidatas(z)]))
+                    pesos.append(self.lam_hora[(z, h)])
+        if not pesos:
+            raise ValueError("nenhuma demanda: α indefinido")
+        numerador = sum(t * p for t, p in zip(termos, pesos)) / sum(pesos)
+        # denominador: cada (zona atual, base) pesa demanda da zona × demanda da base
+        termos, pesos = [], []
+        for z in zonas:
+            for b, wb in self.pesos_base.items():
+                if self.pesos_base[z] > 0 and wb > 0:
+                    termos.append(pstdev([self.distancia(c, b) for c in self.candidatas(z)]))
+                    pesos.append(self.pesos_base[z] * wb)
+        denominador = sum(t * p for t, p in zip(termos, pesos)) / sum(pesos)
         if denominador == 0:
             raise ValueError("as distâncias às bases não variam entre as candidatas: α indefinido")
         return numerador / denominador
@@ -87,14 +104,15 @@ def preferencias_do_csv(caminho_lambda, grade, lado, tipo_dia, n_dias, peso_dema
     """Preferencias a partir do lambda_{lado}.csv (a escala de todos os dados), para um tipo
     de dia; n_dias = número de dias de treino desse tipo (DIAS_POR_TIPO). Imprime o α."""
     previsao = previsao_do_csv(caminho_lambda, grade, tipo_dia, fracao=1.0)
-    demanda_hora, demanda_dia = {}, {}
+    lam_hora, demanda_hora, demanda_dia = {}, {}, {}
     for z in grade.zonas():
         for h in range(HORAS_POR_DIA):
             lam = sum(previsao.lam(z, PASSOS_POR_HORA * h + k) for k in range(PASSOS_POR_HORA))
+            lam_hora[(z, h)] = lam
             demanda_hora[(z, h)] = lam + CORRECAO_PEDIDOS / n_dias
             demanda_dia[z] = demanda_dia.get(z, 0.0) + lam
     total = sum(demanda_dia.values())
     pesos_base = {z: d / total for z, d in demanda_dia.items()}
-    pref = Preferencias(grade, lado, demanda_hora, pesos_base, peso_demanda)
+    pref = Preferencias(grade, lado, lam_hora, demanda_hora, pesos_base, peso_demanda)
     print(f"preferências {lado} m, {tipo_dia}: α = {pref.alfa:.4f} por km")
     return pref

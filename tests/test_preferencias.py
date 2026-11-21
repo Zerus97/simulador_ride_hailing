@@ -37,15 +37,17 @@ def padrao(z, h):
 
 
 def alfa_a_mao():
-    # numerador: média, sobre as zonas (todas as horas iguais), do desvio-padrão de log D
+    # numerador: desvio-padrão de log D por zona (todas as horas iguais), pesado pela
+    # demanda da hora (1,75 : 3,75 : 0; a zona 2 não pesa)
     sd_z0 = L / 2                       # candidatas 0, 1: (L, 2L)
     sd_z1 = L * math.sqrt(78 / 27)      # candidatas 1, 0, 2: (2L, L, −2L)
-    sd_z2 = 2 * L                       # candidatas 2, 1: (−2L, 2L)
-    numerador = (sd_z0 + sd_z1 + sd_z2) / 3
-    # denominador: bases pesadas pela demanda do dia (1,75 : 3,75 : 0)
+    numerador = (1.75 * sd_z0 + 3.75 * sd_z1) / 5.5
+    # denominador: cada (zona, base) pesa demanda da zona × demanda da base
     w0, w1 = 1.75 / 5.5, 3.75 / 5.5
-    z1 = w0 * math.sqrt(2 / 3) + w1 * math.sqrt(2 / 9)  # distâncias (1,0,2) e (0,1,1)
-    denominador = (0.5 + z1 + 0.5) / 3                   # nas zonas 0 e 2, sempre 0,5
+    # zona 0, candidatas 0 e 1: desvio 0,5 para qualquer base
+    # zona 1, candidatas 1, 0, 2: base 0 -> distâncias (1, 0, 2); base 1 -> (0, 1, 1)
+    denominador = (w0 * (w0 + w1) * 0.5
+                   + w1 * (w0 * math.sqrt(2 / 3) + w1 * math.sqrt(2 / 9))) / (w0 + w1) ** 2
     return numerador / denominador
 
 
