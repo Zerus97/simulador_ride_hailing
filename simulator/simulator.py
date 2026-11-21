@@ -234,6 +234,10 @@ class Simulador:
         repositioning = self.algoritmo.decidir(obs)
         tempo_decisao = time.perf_counter() - inicio
         self.ultimo_tempo_decisao = tempo_decisao  # s, do decidir deste passo
+        # mover ou ficar, pela zona na hora da decisão (só para as métricas de aceite)
+        zona_na_decisao = dict(obs.ociosos)
+        tipos_recomendacao = {vid: ("ficar" if destino == zona_na_decisao.get(vid) else "mover")
+                              for vid, destino in repositioning.items()}
         self.repositioning(repositioning)
         self.ociosidade()
         self.ultimo_relatorio = RelatorioDoPasso(
@@ -252,6 +256,7 @@ class Simulador:
                                novos, self._corridas_novas,
                                estados=Counter(v.estado for v in self.veiculos),
                                tempo_decisao=tempo_decisao,
+                               tipos_recomendacao=tipos_recomendacao,
                                confianca=(self.comportamento.confianca_media()
                                           if hasattr(self.comportamento, "confianca_media") else None))
 

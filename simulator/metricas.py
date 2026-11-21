@@ -30,6 +30,7 @@ class ColetorMetricas:
         self.corridas = []      # corridas de pedidos criados depois do aquecimento
         self.movimentos = []    # (id, origem, destino, tipo, hora) depois do aquecimento
         self.aceites = self.recusas = 0
+        self.por_tipo = {"mover": [0, 0], "ficar": [0, 0]}   # tipo -> [aceites, recusas]
         self.sucessos = self.avaliados = 0
         self._recomendados_anteriores = []   # (id, destino) do passo anterior, à espera do matching
         self.estados = {}       # estado -> soma de veículos-passo
@@ -41,7 +42,7 @@ class ColetorMetricas:
         return tempo > self.passos_aquecimento
 
     def registrar(self, relatorio, hora, pedidos_novos, corridas_novas, estados=None, tempo_decisao=None,
-                  confianca=None):
+                  confianca=None, tipos_recomendacao=None):
         """Eventos do passo relatorio.tempo: o relatório, a hora do dia, os pedidos
         criados e as corridas iniciadas (o matching) nesse passo, quantos veículos há em
         cada estado no fim do passo e o tempo de relógio do decidir (s)."""
@@ -65,6 +66,11 @@ class ColetorMetricas:
         self.movimentos.extend((*m, hora) for m in relatorio.movimentos)
         self.aceites += len(relatorio.aceites)
         self.recusas += len(relatorio.recusas)
+        if tipos_recomendacao is not None:  # {id: "mover"/"ficar"} das recomendações do passo
+            for vid in relatorio.aceites:
+                self.por_tipo[tipos_recomendacao[vid]][0] += 1
+            for vid in relatorio.recusas:
+                self.por_tipo[tipos_recomendacao[vid]][1] += 1
         self._recomendados_anteriores = [(vid, d) for vid, _, d, tipo in relatorio.movimentos
                                          if tipo == "recomendado"]
         if estados is not None:
@@ -95,6 +101,9 @@ class ColetorMetricas:
                                     if self.tempos is not None else None),
             # --- secundárias ---
             "aceite": _razao(self.aceites, self.aceites + self.recusas),
+            # separadas, para a comparação entre algoritmos não misturar mover e ficar
+            "aceite_mover": _razao(self.por_tipo["mover"][0], sum(self.por_tipo["mover"])),
+            "aceite_ficar": _razao(self.por_tipo["ficar"][0], sum(self.por_tipo["ficar"])),
             "reposicionamentos_avaliados": self.avaliados,
             "reposicionamento_sucesso": _razao(self.sucessos, self.avaliados),
             "ganhos_usd_por_veiculo": ((receita - CUSTO_USD_KM * km_todos) / self.num_veiculos

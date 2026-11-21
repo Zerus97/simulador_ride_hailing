@@ -201,3 +201,34 @@ def test_tempo_de_decisao():
     sim.rodar(3)
     m = sim.metricas()
     assert m["decisao_media_s"] >= 0.01 and m["decisao_max_s"] >= m["decisao_media_s"]
+
+
+
+def test_aceite_separado_em_mover_e_ficar():
+    from algorithms.algoritmo_reposicionamento import AlgoritmoReposicionamento
+    from environment.comportamento import ModeloAceite
+
+    class ParesFicamImparesMovem(AlgoritmoReposicionamento):
+        def decidir(self, obs):
+            return {vid: (zona if vid % 2 == 0 else obs.grade.vizinhas(zona)[0]) for vid, zona in obs.ociosos}
+
+    class AceitaSoFicar(ModeloAceite):
+        def prob(self, veiculo, zona_recomendada, ctx):
+            return 1.0 if zona_recomendada == veiculo.zona else 0.0
+
+    sim = Simulador(GradeQuadrada(5), num_veiculos=20, demanda=DemandaPoisson(0.3), algoritmo=ParesFicamImparesMovem(),
+                    seed=0, comportamento=Comportamento(AceitaSoFicar(), Ficar()), passos_aquecimento=0)
+    sim.rodar(30)
+    m = sim.metricas()
+    assert (m["aceite_ficar"], m["aceite_mover"]) == (1.0, 0.0)
+    c = sim.coletor
+    assert m["aceite"] == pytest.approx(sum(c.por_tipo["ficar"]) / (sum(c.por_tipo["ficar"]) + sum(c.por_tipo["mover"])))
+    assert sum(c.por_tipo["mover"]) > 0 and sum(c.por_tipo["ficar"]) > 0
+
+
+def test_aceite_so_de_ficar_deixa_o_de_mover_indefinido():
+    sim = Simulador(GradeQuadrada(5), num_veiculos=100, demanda=DemandaPoisson(0.2), algoritmo=FicarTodos(), seed=0,
+                    comportamento=Comportamento(AceiteFixo(0.3), Ficar()), passos_aquecimento=0)
+    sim.rodar(10)
+    m = sim.metricas()
+    assert m["aceite_ficar"] == pytest.approx(m["aceite"]) and math.isnan(m["aceite_mover"])
