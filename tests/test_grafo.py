@@ -60,6 +60,17 @@ def test_vizinhas_sao_zonas_do_grafo(grafo):
         assert not fora, f"{z} tem vizinhas que não são zonas do grafo: {fora}"
 
 
+@pytest.mark.parametrize("grafo, esperado", [
+    (GradeQuadrada(5), True),
+    (GradeCelulas(ESCADA), True),
+    (GradeCelulas([(0, 0), (0, 2)]), False),  # duas células separadas
+    # sem (1,1)-(1,2) e (1,1)-(2,2), as zonas 3 e 4 ficam ilhadas, como Randalls ficaria
+    (GradeCelulas(ESCADA, nao_vizinhos=[((1, 1), (1, 2)), ((1, 1), (2, 2))]), False),
+], ids=["quadrada_5x5", "escada", "duas_separadas", "escada_com_ilha"])
+def test_conexo(grafo, esperado):
+    assert grafo.conexo() == esperado
+
+
 def test_contagem_de_vizinhas_5x5():
     # só vale para a 5x5: 4 cantos com 3 vizinhas, 12 bordas com 5 e 9 zonas internas com 8
     grafo = GradeQuadrada(5)

@@ -7,5 +7,5 @@ __pycache__/
 testes.py
 dataset/
 .pytest_cache/
-embarques.pngcache/
+embarques.png
 cache/

@@ -1,6 +1,10 @@
+from pathlib import Path
+
 import pytest
 
-from environment.env import GradeCelulas, GradeQuadrada
+from environment.env import GradeCelulas, GradeQuadrada, grade_do_csv
+
+DATASET = Path(__file__).resolve().parent.parent / "dataset"
 
 
 # Escada de cinco células (linha, coluna); ids na ordem (linha, coluna):
@@ -47,13 +51,12 @@ def test_celula_e_zona_sao_inversas(escada):
         assert escada.zona(escada.celula(z)) == z
 
 
-def test_grade_completa_igual_a_quadrada():
-    quadrada = GradeQuadrada(5)
-    completa = GradeCelulas([(i, j) for i in range(5) for j in range(5)])
-    # listas, não conjuntos: a ordem das vizinhas importa (o Hotspot desempata por ela)
-    assert completa.zonas() == quadrada.zonas()
-    for z in quadrada.zonas():
-        assert completa.vizinhas(z) == quadrada.vizinhas(z), f"zona {z}"
+def test_ordem_das_vizinhas_5x5():
+    # listas, não conjuntos: a ordem das vizinhas importa (o Hotspot desempata por ela).
+    # Ordem de DIRECOES: cima, baixo, esquerda, direita e depois as diagonais.
+    g = GradeQuadrada(5)
+    assert g.vizinhas(0) == [5, 1, 6]                       # baixo, direita, diagonal
+    assert g.vizinhas(12) == [7, 17, 11, 13, 6, 8, 16, 18]
 
 
 def test_excluir_celula_inexistente_da_erro():
@@ -70,3 +73,25 @@ def test_par_nao_adjacente_da_erro():
 def test_celula_repetida_da_erro():
     with pytest.raises(ValueError):
         GradeCelulas([(0, 0), (0, 0)])
+
+
+# --- Leitura do CSV ---
+
+def test_grade_do_csv(tmp_path):
+    # linhas em ordem invertida e uma coluna a mais: nenhuma das duas pode atrapalhar
+    caminho = tmp_path / "grade.csv"
+    caminho.write_text("linha,coluna,embarques\n2,2,9\n1,2,9\n1,1,9\n1,0,9\n0,0,9\n")
+    g = grade_do_csv(caminho)
+    assert [g.celula(z) for z in g.zonas()] == sorted(ESCADA)
+
+
+# Os números de zonas mudam se as pendências da Roosevelt Island e das células
+# quase vazias forem resolvidas; aí este teste é atualizado.
+@pytest.mark.parametrize("lado, n_zonas", [(1200, 64), (600, 199)])
+def test_manhattan_e_conexa(lado, n_zonas):
+    caminho = DATASET / f"grade_{lado}.csv"
+    if not caminho.exists():
+        pytest.skip("dataset fora do repositório")
+    g = grade_do_csv(caminho)
+    assert len(g.zonas()) == n_zonas
+    assert g.conexo()

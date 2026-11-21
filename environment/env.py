@@ -1,3 +1,5 @@
+import csv
+
 from environment.grafo_zonas import GrafoZonas
 
 # Vizinhança das grades: cima, baixo, esquerda, direita e diagonais.
@@ -5,34 +7,12 @@ from environment.grafo_zonas import GrafoZonas
 DIRECOES = [(-1, 0), (1, 0), (0, -1), (0, 1), (-1, -1), (-1, 1), (1, -1), (1, 1)]
 
 
-class GradeQuadrada(GrafoZonas):
-    """A cidade dividida em zonas, numa grade quadrada size x size."""
-
-    def __init__(self, size):
-        self.size = size  # ex.: size=5  ->  cidade 5x5 = 25 zonas
-
-    def zonas(self):
-        """Lista de todas as zonas, cada uma identificada por um id inteiro."""
-        return [(i * self.size + j) for i in range(self.size) for j in range(self.size)]
-
-    def vizinhas(self, zona):
-        """Zonas adjacentes (cima, baixo, esquerda, direita e diagonais) dentro da grade."""
-        i, j = divmod(zona, self.size)
-        resultado = []
-        for di, dj in DIRECOES:
-            ni, nj = i + di, j + dj
-            if 0 <= ni < self.size and 0 <= nj < self.size:
-                resultado.append(ni * self.size + nj)
-        return resultado
-
-
 class GradeCelulas(GrafoZonas):
     """Grade com só as células que existem (ex.: as células de Manhattan com viagens).
 
     celulas: (linha, coluna) de cada célula. Os ids das zonas são 0, 1, 2, ...
         na ordem (linha, coluna) crescente, independente da ordem recebida.
-        Com todas as células de um quadrado n x n, os ids e as vizinhas saem
-        iguais aos da GradeQuadrada(n).
+        Num quadrado n x n completo, a célula (i, j) tem id i * n + j.
     nao_vizinhos: pares de células adjacentes que NÃO são vizinhas (ex.: os
         pares com mais de 15 min, como as travessias do Central Park). A
         vizinhança é simétrica: o par (a, b) tira a->b e b->a.
@@ -75,6 +55,26 @@ class GradeCelulas(GrafoZonas):
     def zona(self, celula):
         """Id da zona que corresponde à célula (linha, coluna)."""
         return self._ids[tuple(celula)]
+
+
+class GradeQuadrada(GradeCelulas):
+    """Grade quadrada size x size completa: caso particular da GradeCelulas."""
+
+    def __init__(self, size):
+        self.size = size  # ex.: size=5  ->  cidade 5x5 = 25 zonas
+        super().__init__([(i, j) for i in range(size) for j in range(size)])
+
+
+def grade_do_csv(caminho, nao_vizinhos=()):
+    """GradeCelulas a partir de um CSV com as colunas linha e coluna (ex.: dataset/grade_1200.csv).
+
+    Usa o csv da biblioteca padrão, e não o pandas, para o simulador não depender
+    das bibliotecas do ETL. É uma função, e não um método da GradeCelulas, porque
+    a GradeQuadrada herdaria o método, e o construtor dela só recebe size.
+    """
+    with open(caminho, newline="") as f:
+        celulas = [(int(r["linha"]), int(r["coluna"])) for r in csv.DictReader(f)]
+    return GradeCelulas(celulas, nao_vizinhos)
 
 
 class Veiculo:
