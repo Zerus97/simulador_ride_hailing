@@ -42,13 +42,15 @@ from algorithms.hotspot import Hotspot
 from algorithms.sem_movimento import SemMovimento
 from algorithms.sem_recomendacao import SemRecomendacao
 from algorithms.vizinho_aleatorio import VizinhoAleatorio
-from environment.comportamento import (AceiteFixo, Comportamento, ComportamentoAshkrof, ConfiancaEvolutiva,
+from environment.comportamento import (COEFICIENTES_LOGISTICA, AceiteFixo, AceiteRecomendacao, Comportamento,
+                                       ComportamentoAshkrof, ConfiancaEvolutiva,
                                        ConfiancaQuestionario,
                                        Ficar, Proporcional,
                                        UniformeQuatroPreferidas, ZonaPreferida)
 from environment.env import grade_do_csv, nao_vizinhos_do_csv
 from environment.preferencias import DIAS_POR_TIPO, preferencias_do_csv
 from environment.previsao import previsao_do_csv
+from environment.renda import renda_do_csv
 from environment.tempo import PASSOS_POR_DIA
 from environment.tempos import tempos_do_csv
 from environment.calendario import (DIAS_AVALIACAO, DIAS_AVALIACAO_EXTRAS, DIAS_TREINO, DIAS_VALIDACAO,
@@ -67,7 +69,7 @@ ALGORITMOS = {
     "gulosa": GulosaDemanda,
     "hotspot": Hotspot,
 }
-MODELOS_ACEITE = ("fixo", "questionario", "evolutivo", "ashkrof")
+MODELOS_ACEITE = ("fixo", "questionario", "evolutivo", "ashkrof", "logistica")
 REGRAS = {"ficar": Ficar, "proporcional": Proporcional, "preferida": ZonaPreferida,
           "quatro_preferidas": UniformeQuatroPreferidas}
 LADOS = (1200, 600)
@@ -93,6 +95,8 @@ class Cenario:
     modelo_aceite: str
     rho: float | None
     n0: float | None
+    deterministico: bool | None
+    coeficientes: str | None
     regra: str | None
     sem_recomendacao: str
     algoritmo: str
@@ -126,7 +130,7 @@ def _campo(secao, dados, nome, tipo, condicao=None, descricao="", obrigatorio=Tr
         return None
     valor = dados[nome]
     tipos = (int, float) if tipo is float else tipo
-    if isinstance(valor, bool) or not isinstance(valor, tipos):
+    if (tipo is not bool and isinstance(valor, bool)) or not isinstance(valor, tipos):
         raise ErroCenario(f"[{secao}] {nome} = {valor!r}: esperado {getattr(tipo, '__name__', tipo)}")
     if condicao is not None and not condicao(valor):
         raise ErroCenario(f"[{secao}] {nome} = {valor!r}: {descricao}")
@@ -165,7 +169,8 @@ def validar(dados):
     if vc["aquecimento"] >= vc["passos"]:
         raise ErroCenario("[cenario] o aquecimento precisa ser menor que o número de passos")
 
-    _sem_extras("comportamento", b, ("modelo", "rho", "n0", "regra", "sem_recomendacao"))
+    _sem_extras("comportamento", b, ("modelo", "rho", "n0", "deterministico", "coeficientes", "regra",
+                                     "sem_recomendacao"))
     modelo = _campo("comportamento", b, "modelo", str, lambda v: v in MODELOS_ACEITE, f"um de {MODELOS_ACEITE}")
     rho = _campo("comportamento", b, "rho", float, lambda v: 0 <= v <= 1, "em [0, 1]",
                  obrigatorio=(modelo == "fixo"))
@@ -175,6 +180,14 @@ def validar(dados):
                 obrigatorio=(modelo == "evolutivo"))
     if modelo != "evolutivo" and n0 is not None:
         raise ErroCenario("[comportamento] n0 só vale com modelo = \"evolutivo\"")
+    deterministico = _campo("comportamento", b, "deterministico", bool, obrigatorio=False)
+    coeficientes = _campo("comportamento", b, "coeficientes", str, lambda v: v in COEFICIENTES_LOGISTICA,
+                          f"um de {tuple(COEFICIENTES_LOGISTICA)}", obrigatorio=False)
+    if modelo != "logistica" and (deterministico is not None or coeficientes is not None):
+        raise ErroCenario("[comportamento] deterministico e coeficientes só valem com modelo = \"logistica\"")
+    if modelo == "logistica" and (coeficientes or "publicados") not in COEFICIENTES_LOGISTICA:
+        raise ErroCenario(f"[comportamento] coeficientes = {coeficientes or 'publicados'!r} ainda não "
+                          f"registrados; disponíveis: {tuple(COEFICIENTES_LOGISTICA)}")
     # o Ashkrof decide sozinho para onde vai quem recusa: sem regra pós-recusa
     regra = _campo("comportamento", b, "regra", str, lambda v: v in REGRAS, f"um de {tuple(REGRAS)}",
                    obrigatorio=(modelo != "ashkrof"))
@@ -197,7 +210,8 @@ def validar(dados):
     saida = _campo("execucao", e, "saida", str, lambda v: v.strip() != "", "não pode ser vazio")
 
     cenario = Cenario(**vc, modelo_aceite=modelo, rho=None if rho is None else float(rho),
-                      n0=None if n0 is None else float(n0), regra=regra,
+                      n0=None if n0 is None else float(n0), deterministico=deterministico,
+                      coeficientes=coeficientes, regra=regra,
                       sem_recomendacao=sem, algoritmo=algoritmo, sementes=tuple(sementes), saida=saida)
     cenario.tipo_dia  # sexta, domingo e dias excluídos dão erro já na leitura
     _guarda_de_vazamento(cenario)
@@ -234,22 +248,26 @@ def _pecas(lado, tipo_dia, fracao, fator_demanda):
     tempos = tempos_do_csv(DATASET / f"tempos_{lado}.csv", DATASET / "fatores_hora.csv", grade, lado, tipo_dia)
     preferencias = preferencias_do_csv(DATASET / f"lambda_{lado}.csv", grade, lado, tipo_dia,
                                        DIAS_POR_TIPO[tipo_dia])
-    return grade, previsao, tempos, preferencias
+    renda = renda_do_csv(DATASET / f"renda_{lado}.csv", grade, tipo_dia)
+    return grade, previsao, tempos, preferencias, renda
 
 
 def montar(cenario, pedidos, semente):
     """Simulador pronto para o cenário e a semente. pedidos: o pedidos_{lado}.parquet."""
-    grade, previsao, tempos, preferencias = _pecas(cenario.lado, cenario.tipo_dia,
+    grade, previsao, tempos, preferencias, renda = _pecas(cenario.lado, cenario.tipo_dia,
                                                    cenario.fracao, cenario.fator_demanda)
     demanda = DemandaRegistros(pedidos, cenario.dia, cenario.fracao_efetiva, cenario.passo_inicial)
     if cenario.modelo_aceite == "ashkrof":
         comportamento = ComportamentoAshkrof(sem_recomendacao=cenario.sem_recomendacao)
     else:
         modelo = {"fixo": lambda: AceiteFixo(cenario.rho), "questionario": ConfiancaQuestionario,
-                  "evolutivo": lambda: ConfiancaEvolutiva(cenario.n0)}[cenario.modelo_aceite]()
+                  "evolutivo": lambda: ConfiancaEvolutiva(cenario.n0),
+                  "logistica": lambda: AceiteRecomendacao(
+                      deterministico=bool(cenario.deterministico),
+                      coeficientes=cenario.coeficientes or "publicados")}[cenario.modelo_aceite]()
         comportamento = Comportamento(modelo, REGRAS[cenario.regra](), sem_recomendacao=cenario.sem_recomendacao)
     sim = Simulador(grade, cenario.frota, demanda, ALGORITMOS[cenario.algoritmo](), seed=semente,
                     previsao=previsao, tempos=tempos, preferencias=preferencias,
-                    comportamento=comportamento, passos_aquecimento=cenario.aquecimento)
+                    comportamento=comportamento, passos_aquecimento=cenario.aquecimento, renda=renda)
     sim.cenario = cenario
     return sim

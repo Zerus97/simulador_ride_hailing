@@ -15,8 +15,8 @@ tempos não há minutos nem km de reposicionamento), a métrica sai None, e não
 import math
 
 from environment.env import EM_CORRIDA, OCIOSO, REPOSICIONANDO
+from environment.renda import TARIFA_USD_KM  # Q4: a fonte única da tarifa
 
-TARIFA_USD_KM = 3.25          # Q4
 CUSTO_USD_KM = 0.23           # custo de rodar, em todo movimento (os três tipos)
 TIPOS_MOVIMENTO = ("recomendado", "pos_recusa", "proprio")
 

@@ -17,6 +17,7 @@ carrega converte para int64 (no simulador, tarefa 1.4c).
 import numpy as np
 import pandas as pd
 
+from environment.renda import TARIFA_USD_KM
 from environment.tempo import PASSOS_POR_DIA, SEGUNDOS_POR_PASSO
 from etl.etl import DATASET, DIAS_TREINO, KM_POR_MILHA, SABADOS_TREINO, SAIDA, duracao_min
 from etl.grade import LADOS, celula, pontas_em_metros
@@ -80,6 +81,23 @@ def previsao_lambda(pedidos, grade, tipos=TIPOS_DE_DIA):
     return tabela[["tipo_dia", "passo", "linha", "coluna", "pedidos_medios"]]
 
 
+def renda_por_celula(pedidos, grade, tipos=TIPOS_DE_DIA):
+    """Tabela densa: toda célula × cada tipo de dia, com o número de corridas que começam
+    na célula nos dias de treino e a tarifa média delas (3,25 USD/km × km); 0 e 0 onde
+    não houve corrida (a RendaEsperada dá fator 1,0 a essas zonas)."""
+    celulas = pd.MultiIndex.from_frame(grade[["linha", "coluna"]].rename(columns={"linha": "linha_o",
+                                                                                 "coluna": "coluna_o"}))
+    partes = []
+    for tipo, dias in tipos.items():
+        do_tipo = pedidos[pedidos["dia"].isin(dias)]
+        g = do_tipo.assign(tarifa=TARIFA_USD_KM * do_tipo["km"]).groupby(["linha_o", "coluna_o"])["tarifa"]
+        tabela = pd.DataFrame({"corridas": g.size(), "tarifa_media": g.mean()}).reindex(celulas)
+        tabela = tabela.fillna({"corridas": 0, "tarifa_media": 0.0}).astype({"corridas": int})
+        partes.append(tabela.reset_index().assign(tipo_dia=tipo))
+    renda = pd.concat(partes, ignore_index=True).rename(columns={"linha_o": "linha", "coluna_o": "coluna"})
+    return renda[["tipo_dia", "linha", "coluna", "corridas", "tarifa_media"]]
+
+
 if __name__ == "__main__":
     df = pd.read_parquet(SAIDA)
     origem = origem_grade()
@@ -116,3 +134,11 @@ if __name__ == "__main__":
         arquivo = DATASET / f"lambda_{lado}.csv"
         lam.to_csv(arquivo, index=False)
         print(f"salvo: {arquivo.name} ({len(lam):,} linhas)")
+
+        renda = renda_por_celula(pedidos, grade)
+        for tipo, dias in TIPOS_DE_DIA.items():
+            assert renda.loc[renda["tipo_dia"] == tipo, "corridas"].sum() == pedidos["dia"].isin(dias).sum()
+        arquivo = DATASET / f"renda_{lado}.csv"
+        renda.to_csv(arquivo, index=False)
+        print(f"salvo: {arquivo.name} ({len(renda):,} linhas; zonas sem corridas: "
+              f"{(renda['corridas'] == 0).sum()})")

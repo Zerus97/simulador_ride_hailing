@@ -11,7 +11,7 @@ class Simulador:
     """Junta a grade e os veiculos, e faz o tempo avancar em passos."""
 
     def __init__(self, grade, num_veiculos, demanda, algoritmo, seed=None, previsao=None, tempos=None,
-                 preferencias=None, comportamento=None, passos_aquecimento=6):
+                 preferencias=None, comportamento=None, passos_aquecimento=6, renda=None):
         """demanda: a fonte de demanda (ex.: DemandaPoisson), que diz quais pedidos
         chegam a cada passo e define o calendário (passo_do_dia); ver simulator/demanda.py.
         previsao e tempos: só repassados aos algoritmos, na observação
@@ -39,11 +39,16 @@ class Simulador:
         self.previsao = previsao
         self.tempos = tempos
         self.preferencias = preferencias
+        self.renda = renda
         if comportamento is None:
             comportamento = Comportamento(AceiteFixo(1.0), Ficar(), sem_recomendacao="ficar")
         if getattr(comportamento, "precisa_tempos", False) and tempos is None:
             raise ValueError("o comportamento usa os tempos até a zona recomendada (Ashkrof), "
                              "mas o simulador não recebeu tempos")
+        for exige, recebido, nome in ((getattr(comportamento, "precisa_previsao", False), previsao, "previsao"),
+                                      (getattr(comportamento, "precisa_renda", False), renda, "renda")):
+            if exige and recebido is None:
+                raise ValueError(f"o comportamento usa {nome}, mas o simulador não recebeu {nome}")
         if comportamento.precisa_preferencias and preferencias is None:
             raise ValueError("o comportamento sorteia pelas preferências (regra Proporcional ou "
                              "sem_recomendacao='preferencias'), mas o simulador não recebeu preferencias")
@@ -175,7 +180,9 @@ class Simulador:
         ctx = Contexto(hora=self.fonte_demanda.passo_do_dia(self.tempo) // 6,
                        preferencias=self.preferencias, grade=self.grade,
                        tipo_dia=getattr(self.fonte_demanda, "tipo_dia", None),
-                       tempo=self.tempo, tempos=self.tempos)
+                       tempo=self.tempo, tempos=self.tempos, previsao=self.previsao,
+                       passo_do_dia=self.fonte_demanda.passo_do_dia(self.tempo), renda=self.renda,
+                       oferta=self.oferta_inicial())
         for veiculo in self.veiculos:  # ordem de id
             if veiculo.estado != OCIOSO:
                 continue
@@ -190,9 +197,20 @@ class Simulador:
             if destino != veiculo.zona:
                 tipo = {True: "recomendado", False: "pos_recusa", None: "proprio"}[aceitou]
                 self._movimentos.append((veiculo.id, veiculo.zona, destino, tipo))
+                ctx.oferta[destino] = ctx.oferta.get(destino, 0) + 1   # quem decide depois vê
+                ctx.oferta[veiculo.zona] -= 1
                 veiculo.estado = REPOSICIONANDO
                 veiculo.destino = destino
                 veiculo.chegada = self.tempo + 1
+
+    def oferta_inicial(self):
+        """Carros por zona no começo das respostas: os ociosos mais as chegadas de corridas
+        em t + 1 (as mesmas de obs.chegadas)."""
+        oferta = Counter(v.zona for v in self.veiculos if v.estado == OCIOSO)
+        for corrida in self.corridas_ativas:
+            if corrida.horario_chegada == self.tempo + 1:
+                oferta[corrida.pedido.destino] += 1
+        return dict(oferta)
 
     def validar_recomendacoes(self, moves):
         """Cada (id, destino) precisa ser de um veículo ocioso, para a zona atual dele

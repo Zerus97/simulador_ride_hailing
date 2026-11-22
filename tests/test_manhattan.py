@@ -25,7 +25,8 @@ BASELINES = {"sem_movimento": "ficar", "sem_recomendacao": "preferencias",
              "vizinho_aleatorio": "ficar", "gulosa": "ficar"}
 COMBINACOES = (list(product(BASELINES, ("fixo", "questionario", "evolutivo"),
                             ("ficar", "proporcional", "preferida", "quatro_preferidas")))
-               + [(b, "ashkrof", None) for b in BASELINES])  # o Ashkrof decide o destino da recusa
+               + [(b, "ashkrof", None) for b in BASELINES]  # o Ashkrof decide o destino da recusa
+               + list(product(BASELINES, ("logistica",), ("ficar", "proporcional"))))
 
 
 @pytest.fixture(scope="module")

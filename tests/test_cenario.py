@@ -140,3 +140,18 @@ def test_modelo_ashkrof_no_cenario(tmp_path):
     c = ler_cenario(escrever(tmp_path, {("comportamento", "modelo"): "ashkrof"},
                              tirar=[("comportamento", "rho"), ("comportamento", "regra")]))
     assert (c.modelo_aceite, c.regra, c.rho, c.n0) == ("ashkrof", None, None, None)
+
+
+def test_modelo_logistica_no_cenario(tmp_path):
+    base = {("comportamento", "modelo"): "logistica", ("comportamento", "coeficientes"): "reajuste",
+            ("comportamento", "deterministico"): True}
+    c = ler_cenario(escrever(tmp_path, base, tirar=[("comportamento", "rho")]))
+    assert (c.modelo_aceite, c.coeficientes, c.deterministico, c.regra) == ("logistica", "reajuste", True, "ficar")
+    padrao = ler_cenario(escrever(tmp_path, {("comportamento", "modelo"): "logistica"}, tirar=[("comportamento", "rho")]))
+    assert padrao.coeficientes is None  # o montar usa "publicados", o padrão
+    with pytest.raises(ErroCenario, match="coeficientes"):
+        ler_cenario(escrever(tmp_path, {**base, ("comportamento", "coeficientes"): "xyz"}, tirar=[("comportamento", "rho")]))
+    with pytest.raises(ErroCenario, match="deterministico"):
+        ler_cenario(escrever(tmp_path, {("comportamento", "deterministico"): True}))
+    with pytest.raises(ErroCenario, match="deterministico"):
+        ler_cenario(escrever(tmp_path, {**base, ("comportamento", "deterministico"): 1}, tirar=[("comportamento", "rho")]))

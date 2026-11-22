@@ -25,6 +25,10 @@ class Contexto:
     tipo_dia: str = None   # "util"/"sabado" (None: sem calendário, ex.: Poisson; vale como útil)
     tempo: int = None      # passo atual da simulação (para a espera do motorista)
     tempos: object = None  # environment.tempos.TemposEntreZonas, ou None
+    previsao: object = None      # λ (environment.previsao), para a logística do i-Rebalance
+    passo_do_dia: int = None
+    renda: object = None         # environment.renda.RendaEsperada
+    oferta: dict = None          # zona -> carros: ociosos + chegadas em t+1, atualizada a cada movimento
 
 
 def candidatas(zona, grade):
@@ -165,6 +169,82 @@ class ConfiancaEvolutiva(ConfiancaQuestionario):
         return sum(self.confianca(vid) for vid in self.alfa) / len(self.alfa)
 
 
+# Coeficientes da logística do i-Rebalance, (b, w_r, w_m, w_o):
+#   P(aceitar) = σ(b + w_r · r + w_m · m + w_o · o)
+# "publicados" (padrão): Eq. 1 e tabela de Chen et al. (2024).
+# "codigo": a regra do repositório deles (só na validação da Fase 4).
+# "reajuste": a logística reajustada nas 1.854 respostas do questionaire.csv (aceite =
+#   1 − UnAccepted; r = "Ranking ", m = Revenue, o = obey contínuo); erros-padrão 0,254;
+#   0,025; 0,022; 0,210; aceitação média no questionário 0,662.
+COEFICIENTES_LOGISTICA = {
+    "publicados": (-1.31, -0.44, 0.29, 2.17),
+    "codigo": (-1.3959, -0.3892, 0.2932, 1.8379),
+    "reajuste": (-1.306, -0.403, 0.291, 1.858),
+}
+# m = 14,6 × fator(z) × D ÷ max(S, D): 14,6 RMB é a renda média por corrida declarada
+# pelos motoristas no questionário (10 a 20 RMB), a âncora da conversão (Q10). Sem limite
+# em [6, 16].
+RENDA_REFERENCIA = 14.6
+
+
+class AceiteRecomendacao(ConfiancaQuestionario):
+    """Logística do i-Rebalance: o aceite depende da posição da recomendada entre as
+    preferidas (r), da renda esperada nela (m) e da obediência do motorista (o, o
+    sorteio da ConfiancaQuestionario).
+
+      r = posição da recomendada entre as candidatas pelas preferências (1 = favorita;
+          empate pela ordem das candidatas);
+      m = 14,6 × fator(z) × D ÷ max(S, D), com D = λ(z, passo seguinte) e S a oferta em z
+          sem o próprio motorista; m = 0 se D = 0. A oferta é atualizada a cada movimento
+          no mesmo passo, então quem decide depois vê a aglomeração dos anteriores.
+
+    prob = σ(logit); no modo determinístico, 1 se logit ≥ 0 e 0 se não (a regra do código
+    deles). O sorteio com u_aceite continua igual, e o contrato não muda."""
+    precisa_preferencias = precisa_previsao = precisa_renda = True
+
+    def __init__(self, deterministico=False, coeficientes="publicados",
+                 niveis=OBEDIENCIA_NIVEIS, contagens=OBEDIENCIA_CONTAGENS):
+        super().__init__(niveis, contagens)
+        if isinstance(coeficientes, str):
+            if coeficientes not in COEFICIENTES_LOGISTICA:
+                raise ValueError(f"coeficientes {coeficientes!r} ainda não registrados; "
+                                 f"disponíveis: {sorted(COEFICIENTES_LOGISTICA)}")
+            coeficientes = COEFICIENTES_LOGISTICA[coeficientes]
+        self.b, self.w_r, self.w_m, self.w_o = coeficientes
+        self.deterministico = deterministico
+
+    def posicao(self, veiculo, zona_recomendada, ctx):
+        return por_preferencia(veiculo, ctx).index(zona_recomendada) + 1
+
+    def m(self, veiculo, zona_recomendada, ctx):
+        demanda = ctx.previsao.lam(zona_recomendada, ctx.passo_do_dia + 1)
+        if demanda == 0:
+            return 0.0
+        oferta = ctx.oferta.get(zona_recomendada, 0) - (1 if zona_recomendada == veiculo.zona else 0)
+        return RENDA_REFERENCIA * ctx.renda.fator(zona_recomendada) * demanda / max(oferta, demanda)
+
+    def logit_de(self, r, m, o):
+        return self.b + self.w_r * r + self.w_m * m + self.w_o * o
+
+    def prob_de(self, r, m, o):
+        """σ(logit), ou, no modo determinístico, 1 se logit ≥ 0 e 0 se não."""
+        x = self.logit_de(r, m, o)
+        if self.deterministico:
+            return 1.0 if x >= 0 else 0.0
+        return 1 / (1 + math.exp(-x))
+
+    def variaveis(self, veiculo, zona_recomendada, ctx):
+        """(r, m, o) do motorista para a zona recomendada."""
+        return (self.posicao(veiculo, zona_recomendada, ctx), self.m(veiculo, zona_recomendada, ctx),
+                super().prob(veiculo, zona_recomendada, ctx))
+
+    def logit(self, veiculo, zona_recomendada, ctx):
+        return self.logit_de(*self.variaveis(veiculo, zona_recomendada, ctx))
+
+    def prob(self, veiculo, zona_recomendada, ctx):
+        return self.prob_de(*self.variaveis(veiculo, zona_recomendada, ctx))
+
+
 # --- regras pós-recusa ---
 
 class RegraPosRecusa:
@@ -246,7 +326,16 @@ class Comportamento:
 
     @property
     def precisa_preferencias(self):
-        return self.regra.precisa_preferencias or self.sem_recomendacao == "preferencias"
+        return (self.regra.precisa_preferencias or self.sem_recomendacao == "preferencias"
+                or getattr(self.modelo, "precisa_preferencias", False))
+
+    @property
+    def precisa_previsao(self):
+        return getattr(self.modelo, "precisa_previsao", False)
+
+    @property
+    def precisa_renda(self):
+        return getattr(self.modelo, "precisa_renda", False)
 
     def responder(self, veiculo, recomendacao, ctx, u_aceite, u_destino):
         """(aceitou, destino). recomendacao=None é "sem recomendação" (aceitou = None).
