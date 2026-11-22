@@ -28,7 +28,7 @@ class Contexto:
     previsao: object = None      # λ (environment.previsao), para a logística do i-Rebalance
     passo_do_dia: int = None
     renda: object = None         # environment.renda.RendaEsperada
-    oferta: dict = None          # zona -> carros: ociosos + chegadas em t+1, atualizada a cada movimento
+    oferta: dict = None          # zona -> carros: chegadas em t+1 + quem já respondeu neste passo (destino final)
 
 
 def candidatas(zona, grade):
@@ -194,9 +194,11 @@ class AceiteRecomendacao(ConfiancaQuestionario):
 
       r = posição da recomendada entre as candidatas pelas preferências (1 = favorita;
           empate pela ordem das candidatas);
-      m = 14,6 × fator(z) × D ÷ max(S, D), com D = λ(z, passo seguinte) e S a oferta em z
-          sem o próprio motorista; m = 0 se D = 0. A oferta é atualizada a cada movimento
-          no mesmo passo, então quem decide depois vê a aglomeração dos anteriores.
+      m = 14,6 × fator(z) × D ÷ max(S, D), com D = λ(z, passo seguinte) e S a oferta em z:
+          as corridas que chegam em z em t + 1 mais os motoristas que já responderam neste
+          passo (em ordem de id) com destino final z, inclusive os que ficaram em z; m = 0
+          se D = 0. O m é lido antes de o próprio motorista entrar na S, então quem decide
+          depois vê a aglomeração dos anteriores, e ninguém conta a si mesmo.
 
     prob = σ(logit); no modo determinístico, 1 se logit ≥ 0 e 0 se não (a regra do código
     deles). O sorteio com u_aceite continua igual, e o contrato não muda."""
@@ -220,7 +222,7 @@ class AceiteRecomendacao(ConfiancaQuestionario):
         demanda = ctx.previsao.lam(zona_recomendada, ctx.passo_do_dia + 1)
         if demanda == 0:
             return 0.0
-        oferta = ctx.oferta.get(zona_recomendada, 0) - (1 if zona_recomendada == veiculo.zona else 0)
+        oferta = ctx.oferta.get(zona_recomendada, 0)
         return RENDA_REFERENCIA * ctx.renda.fator(zona_recomendada) * demanda / max(oferta, demanda)
 
     def logit_de(self, r, m, o):

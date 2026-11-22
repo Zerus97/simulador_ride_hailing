@@ -73,8 +73,8 @@ def test_bordas_de_m():
     assert modelo().m(v, 1, contexto(lam={1: 0.0}, oferta={1: 5})) == 0.0                  # D = 0
     fator = {z: 1.0 for z in GRADE3.zonas()} | {1: 1.8}
     assert modelo().m(v, 1, contexto(lam={1: 2.0}, oferta={}, fator=fator)) == pytest.approx(14.6 * 1.8)  # S = 0
-    # ficar: o próprio motorista não conta na oferta da zona atual (S = 3 − 1 = 2; contando, daria 3)
-    assert modelo().m(v, 4, contexto(lam={4: 2.0}, oferta={4: 3})) == pytest.approx(14.6 * 2 / 2)
+    # ficar: a S é lida como está (o próprio motorista ainda não entrou nela)
+    assert modelo().m(v, 4, contexto(lam={4: 2.0}, oferta={4: 3})) == pytest.approx(14.6 * 2 / 3)
 
 
 def test_monotonia_em_posicao_renda_e_obediencia():
@@ -170,3 +170,57 @@ def test_reajuste_bate_com_o_questionario():
     erros = np.sqrt(np.diag(np.linalg.inv(X.T @ ((p * (1 - p))[:, None] * X))))
     assert tuple(erros) == pytest.approx((0.254, 0.025, 0.022, 0.210), abs=1e-3)
     assert (len(y), round(y.mean(), 3)) == (1854, 0.662)
+
+
+
+# --- a oferta S (como no i-Rebalance) ---
+
+class Respostas(AlgoritmoReposicionamento):
+    def __init__(self, saida):
+        self.saida = saida
+
+    def decidir(self, obs):
+        return dict(self.saida)
+
+
+def simulador_oferta(saida, zonas):
+    """Carros nas zonas dadas, aceite garantido (determinístico, logit 10), S registrada em cada m."""
+    vistos = []
+
+    class Registra(AceiteRecomendacao):
+        def m(self, veiculo, zona, ctx):
+            vistos.append((veiculo.id, zona, ctx.oferta.get(zona, 0)))
+            return super().m(veiculo, zona, ctx)
+
+    sim = Simulador(GRADE3, num_veiculos=len(zonas), demanda=DemandaPoisson(0), algoritmo=Respostas(saida), seed=0,
+                    previsao=PrevisaoConstante(2.0), preferencias=PREF,
+                    renda=RendaEsperada({z: 1.0 for z in GRADE3.zonas()}),
+                    comportamento=Comportamento(Registra(coeficientes=(10.0, 0.0, 0.0, 0.0), deterministico=True),
+                                                Ficar()))
+    for v, z in zip(sim.veiculos, zonas):
+        v.zona = z
+    return sim, vistos
+
+
+def test_oferta_inicial_so_com_as_chegadas():
+    from tests.test_regras import pedido_no_proximo_passo
+    sim, _ = simulador_oferta({}, zonas=[4, 0])          # carro 0 ocioso na 4; carro 1 na 0
+    pedido_no_proximo_passo(sim, zona=0, destino=4)      # o carro 1 leva um pedido da 0 para a 4
+    sim.passo()                                          # chega na 4 em t + 1
+    assert sim.veiculos[0].estado == "ocioso" and sim.veiculos[0].zona == 4
+    assert sim.oferta_inicial() == {4: 1}                # só a chegada, e não 2
+
+
+def test_ficar_e_sem_recomendacao_somam_na_oferta():
+    # carro 0 sem recomendação (fica na 4); carro 1 mandado ficar na 4; carro 2 mandado ficar na 4
+    sim, vistos = simulador_oferta({1: 4, 2: 4}, zonas=[4, 4, 4])
+    sim.passo()
+    assert vistos == [(1, 4, 1), (2, 4, 2)]   # o 1 vê o 0; o 2 vê o 0 e o 1
+
+
+def test_ordem_das_respostas_na_oferta():
+    # os dois na zona 0, mandados para a vizinha 1: o primeiro vê só as chegadas (nenhuma)
+    sim, vistos = simulador_oferta({0: 1, 1: 1}, zonas=[0, 0])
+    sim.passo()
+    assert vistos == [(0, 1, 0), (1, 1, 1)]
+    assert sim.ultimo_relatorio.aceites == (0, 1)

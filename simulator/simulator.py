@@ -194,19 +194,22 @@ class Simulador:
                 self._aceites.append(veiculo.id)
             elif aceitou is False:
                 self._recusas.append(veiculo.id)
+            # oferta para quem decide depois: o destino final de cada resposta, qualquer que
+            # seja (aceitou e foi, recusou e foi, ficou ou não recebeu recomendação); ficar
+            # conta como chegar à própria zona, como no i-Rebalance
+            ctx.oferta[destino] = ctx.oferta.get(destino, 0) + 1
             if destino != veiculo.zona:
                 tipo = {True: "recomendado", False: "pos_recusa", None: "proprio"}[aceitou]
                 self._movimentos.append((veiculo.id, veiculo.zona, destino, tipo))
-                ctx.oferta[destino] = ctx.oferta.get(destino, 0) + 1   # quem decide depois vê
-                ctx.oferta[veiculo.zona] -= 1
                 veiculo.estado = REPOSICIONANDO
                 veiculo.destino = destino
                 veiculo.chegada = self.tempo + 1
 
     def oferta_inicial(self):
-        """Carros por zona no começo das respostas: os ociosos mais as chegadas de corridas
-        em t + 1 (as mesmas de obs.chegadas)."""
-        oferta = Counter(v.zona for v in self.veiculos if v.estado == OCIOSO)
+        """Oferta por zona no começo das respostas: só as chegadas de corridas em t + 1 (as
+        mesmas de obs.chegadas). Os ociosos entram depois, um a um, no destino final da
+        resposta de cada um."""
+        oferta = Counter()
         for corrida in self.corridas_ativas:
             if corrida.horario_chegada == self.tempo + 1:
                 oferta[corrida.pedido.destino] += 1
